@@ -1,0 +1,39 @@
+name: appdeteccion
+description: "App de fotodeteccion vehicular con IA"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Iconos base
+  cupertino_icons: ^1.0.6
+
+  # --- TUS LIBRERÍAS (Versiones corregidas) ---
+  # Usamos la versión compatible que pedía el error
+  camera: ^0.10.5
+  google_mlkit_text_recognition: ^0.11.0 
+  # Esta librería daba error antes, ahora usamos la correcta
+  flutter_vision: ^1.1.4 
+  image: ^4.1.7
+  http: ^1.2.0
+  
+  # NOTA: No agregamos 'google_mlkit_commons' manualmente
+  # para evitar el error de conflicto que te salió antes.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Tus archivos de IA
+  assets:
+    - assets/best_int8.tflite
+    - assets/labels.txt
