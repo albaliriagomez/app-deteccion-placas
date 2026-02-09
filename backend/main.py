@@ -67,9 +67,9 @@ def init_db():
         conn.commit()
         cursor.close()
         conn.close()
-        print("✅ Base de datos sincronizada: Tablas y Usuario listos.")
+        print(" Base de datos sincronizada: Tablas y Usuario listos.")
     except Exception as e:
-        print(f"❌ Error al inicializar DB: {e}")
+        print(f" Error al inicializar DB: {e}")
 
 @app.on_event("startup")
 async def startup_event():
@@ -125,10 +125,10 @@ async def guardar_placa(registro: RegistroPlaca):
         cursor.close()
         conn.close()
         
-        print(f"💾 MULTA REGISTRADA: {registro.plate} (ID: {nuevo_id})")
+        print(f" MULTA REGISTRADA: {registro.plate} (ID: {nuevo_id})")
         return {"status": "success", "id": nuevo_id}
     except Exception as e:
-        print(f"❌ ERROR AL GUARDAR PLACA: {e}")
+        print(f" ERROR AL GUARDAR PLACA: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # OBTENER REGISTROS (Para el Historial)
