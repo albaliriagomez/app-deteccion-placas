@@ -37,7 +37,28 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Ignorar carpetas de compilacion en CUALQUIER lugar
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+
+# Archivos de Windows/Visual Studio generados
+**/windows/flutter/ephemeral/
+**/*.exe
+**/*.dll
+**/*.obj
+**/*.pdb
+
+# Python (Backend)
+**/__pycache__/
+**/*.pyc
+**/venv/
+**/env/
+**/.env
+
+# IDEs
+**/.idea/
+**/.vscode/
