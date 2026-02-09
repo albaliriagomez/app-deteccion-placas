@@ -28,7 +28,7 @@ class PlateRecord {
 
 class ApiRepository {
   // 1. Usa solo una variable para la IP para no confundirte
-  static const String _baseUrl = 'http://192.168.0.4:8000'; // <--- PON TU IP REAL AQUÍ
+  static const String _baseUrl = 'http://192.168.220.128:8000'; // <--- PON TU IP REAL AQUÍ
 
   Future<bool> savePlateRecord(String plate, String base64) async {
     final response = await http.post(
