@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'presentation/screens/login_screen.dart';
-import 'presentation/screens/scanner_screen.dart'; // Asegúrate de que este archivo exista
+import 'presentation/screens/scanner_screen.dart'; 
 
 void main() {
   runApp(const MyApp());

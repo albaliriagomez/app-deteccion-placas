@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import psycopg2
@@ -7,9 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import uvicorn
 
-app = FastAPI(title="API Fotomultas SEM - Completa")
+app = FastAPI(title="API Fotomultas SEM")
 
-# --- 1. CONFIGURACIÓN DE CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 2. CONFIGURACIÓN DE BASE DE DATOS ---
 DB_CONFIG = {
     "dbname": "multasplacas",
     "user": "postgres",
@@ -33,8 +31,7 @@ def init_db():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Tabla de Registros (Placas detectadas)
+        # Aseguramos que la tabla tenga todas las columnas necesarias
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS registros (
                 id SERIAL PRIMARY KEY,
@@ -45,8 +42,10 @@ def init_db():
                 longitud DECIMAL(11, 8)
             );
         """)
+        # Forzar la creación de columnas si la tabla ya existía sin ellas
+        cursor.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS latitud DECIMAL(10, 8);")
+        cursor.execute("ALTER TABLE registros ADD COLUMN IF NOT EXISTS longitud DECIMAL(11, 8);")
         
-        # Tabla de Usuarios (Para Login)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -55,27 +54,17 @@ def init_db():
                 rol VARCHAR(20) NOT NULL
             );
         """)
-        
-        # Usuario de prueba: Supervisor
-        cursor.execute("SELECT * FROM usuarios WHERE usuario = 'supervisor_sem'")
-        if not cursor.fetchone():
-            cursor.execute("""
-                INSERT INTO usuarios (usuario, password, rol) 
-                VALUES (%s, %s, %s)
-            """, ("supervisor_sem", "123456", "SUPERVISOR"))
-            
         conn.commit()
-        cursor.close()
-        conn.close()
-        print(" Base de datos sincronizada: Tablas y Usuario listos.")
+        print("✅ Base de datos sincronizada correctamente.")
     except Exception as e:
-        print(f" Error al inicializar DB: {e}")
+        print(f"❌ Error al inicializar DB: {e}")
+    finally:
+        if conn: conn.close()
 
 @app.on_event("startup")
 async def startup_event():
     init_db()
 
-# --- 3. MODELOS DE DATOS (Pydantic) ---
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -86,32 +75,20 @@ class RegistroPlaca(BaseModel):
     latitud: Optional[float] = None
     longitud: Optional[float] = None
 
-# --- 4. RUTAS (Endpoints) ---
-
-# LOGIN
 @app.post("/api/login")
 async def login(auth: LoginRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT usuario, rol FROM usuarios 
-        WHERE usuario = %s AND password = %s
-    """, (auth.username, auth.password))
+    cursor.execute("SELECT usuario, rol FROM usuarios WHERE usuario = %s AND password = %s", (auth.username, auth.password))
     user = cursor.fetchone()
-    cursor.close()
     conn.close()
-
     if user:
-        return {
-            "status": "success",
-            "role": user['rol'],
-            "username": user['usuario']
-        }
-    raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        return {"status": "success", "role": user['rol'], "username": user['usuario']}
+    raise HTTPException(status_code=401, detail="Error de login")
 
-# GUARDAR PLACA (Desde el Scanner)
 @app.post("/api/registros")
 async def guardar_placa(registro: RegistroPlaca):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -122,28 +99,23 @@ async def guardar_placa(registro: RegistroPlaca):
         
         nuevo_id = cursor.fetchone()['id']
         conn.commit()
-        cursor.close()
-        conn.close()
-        
-        print(f" MULTA REGISTRADA: {registro.plate} (ID: {nuevo_id})")
+        print(f"🚀 PLACA GUARDADA EN DB: {registro.plate}")
         return {"status": "success", "id": nuevo_id}
     except Exception as e:
-        print(f" ERROR AL GUARDAR PLACA: {e}")
+        if conn: conn.rollback()
+        print(f"❌ ERROR AL GUARDAR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
-# OBTENER REGISTROS (Para el Historial)
 @app.get("/api/registros")
 async def get_all_registros():
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM registros ORDER BY fecha DESC")
-        datos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return datos
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Error al leer registros")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM registros ORDER BY fecha DESC")
+    datos = cursor.fetchall()
+    conn.close()
+    return datos
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
