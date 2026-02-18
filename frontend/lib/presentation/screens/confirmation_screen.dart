@@ -1,15 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../data/api_repository.dart';
+import 'dart:convert';
 
 class ConfirmationScreen extends StatefulWidget {
   final String plate;
   final String imagePath;
+  final String location;
 
   const ConfirmationScreen({
     super.key,
     required this.plate,
     required this.imagePath,
+    required this.location,
   });
 
   @override
@@ -17,6 +21,9 @@ class ConfirmationScreen extends StatefulWidget {
 }
 
 class _ConfirmationScreenState extends State<ConfirmationScreen> {
+  late TextEditingController _plateController;
+  final ApiRepository _apiRepository = ApiRepository();
+  bool _isSaving = false;
   // Colores
   static const Color _darkPurple = Color(0xFF311B92);
   static const Color _successGreen = Color(0xFF8BC34A);
@@ -25,7 +32,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   static const Color _darkGray = Color(0xFF757575);
   static const Color _white = Color(0xFFFFFFFF);
 
-  late TextEditingController _plateController;
   bool _isEditing = false;
 
   @override
@@ -367,11 +373,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
               color: _darkPurple.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.location_on,
-              color: _darkPurple,
-              size: 20,
-            ),
+            child: const Icon(Icons.location_on, color: _darkPurple, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -379,21 +381,13 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ubicación aproximada',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: _darkGray,
-                  ),
+                  'Ubicación detectada',
+                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: _darkGray),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Calle 12 e/ 51 y 53, La Plata',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _darkPurple,
-                  ),
+                  widget.location, // <--- CAMBIO: Usamos la ubicación real
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: _darkPurple),
                 ),
               ],
             ),
@@ -406,44 +400,84 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
-        // Botón primario (Confirmar)
-        Material(
-          child: GestureDetector(
-            onTap: () {
-              // Aquí va la lógica de confirmación
-              Navigator.pop(context, _plateController.text);
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: _darkPurple,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: _darkPurple.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        // Botón Confirmar con Bloqueo de Seguridad
+        AbsorbPointer(
+          absorbing: _isSaving, // Evita clics extra a nivel de widget
+          child: Opacity(
+            opacity: _isSaving ? 0.6 : 1.0,
+            child: ElevatedButton( // Cambiado a ElevatedButton para mejor manejo de estado
+              onPressed: _isSaving ? null : () async {
+                setState(() => _isSaving = true);
+                
+                try {
+                  // 1. Conversión de Imagen
+                  final bytes = await File(widget.imagePath).readAsBytes();
+                  String base64Image = base64Encode(bytes);
+                  
+                  final plateText = _plateController.text.toUpperCase().trim();
+                  // Aseguramos que la ubicación no sea nula o vacía antes de enviar
+                  final locationText = widget.location.isNotEmpty ? widget.location : "Calle desconocida";
+
+                  // 2. Llamada al API con Timeout
+                  final result = await _apiRepository.savePlateRecord(
+                    plateText, 
+                    base64Image, 
+                    location: locationText,
+                  ).timeout(const Duration(seconds: 15));
+
+                  if (!mounted) return;
+
+                  if (result['success'] == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Registro guardado correctamente'),
+                        backgroundColor: _successGreen,
+                      ),
+                    );
+                    
+                    // IMPORTANTE: Primero limpiamos el estado
+                    setState(() => _isSaving = false); 
+
+                    // Agregamos un delay pequeño para que el Navigator no choque con el SnackBar
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        // Usamos pushNamedAndRemoveUntil para limpiar la pila y refrescar el historial
+                        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                      }
+                    });
+                  } else {
+                    throw Exception(result['error'] ?? 'Error del servidor');
+                  }
+                } catch (e) {
+                  print("❌ Error en guardado: $e");
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('❌ Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    setState(() => _isSaving = false);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _darkPurple,
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                elevation: 4,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: _white,
-                    size: 24,
-                  ),
+                  if (_isSaving) 
+                    const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  else 
+                    const Icon(Icons.check_circle, color: Colors.white),
                   const SizedBox(width: 12),
                   Text(
-                    'Confirmar Patente',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _white,
-                      letterSpacing: 0.5,
-                    ),
+                    _isSaving ? 'Guardando...' : 'Confirmar Patente',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                 ],
               ),
@@ -451,53 +485,20 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Botón secundario (Volver a escanear)
-        Material(
-          child: GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: _white,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: _darkPurple,
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.camera_alt,
-                    color: _darkPurple,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Volver a Escanear',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _darkPurple,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
+        // Botón Volver (solo activo si no estamos guardando)
+        if (!_isSaving)
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: _darkPurple, width: 2),
+              minimumSize: const Size(double.infinity, 56),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            ),
+            child: Text(
+              'Volver a Escanear',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: _darkPurple),
             ),
           ),
-        ),
       ],
     );
   }

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../core/services/ai_scanner_service.dart';
 import 'confirmation_screen.dart';
 import '../../data/api_repository.dart';
@@ -17,15 +19,16 @@ class ScannerScreen extends StatefulWidget {
 class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProviderStateMixin {
   CameraController? _controller;
   final AIScannerService _aiService = AIScannerService();
-  final ApiRepository _apiRepository = ApiRepository();
   bool _isCameraReady = false;
   bool _isProcessing = false;
   bool _isFlashOn = false;
   late TabController _tabController;
+  // Key para acceder al estado de RecordsScreen y agregar registros en caliente
+  final GlobalKey<RecordsScreenState> _recordsKey = GlobalKey<RecordsScreenState>();
 
   // Color palette
   static const Color _neonCyan = Color(0xFF00E5FF);
-  static const Color _brightBlue = Color(0xFF1E88E5);
+  static const Color _brightBlue = Color(0xFF4ABFDD);
   static const Color _darkBg = Color(0xFF0D1B2A);
   static const Color _lightBg = Color(0xFFF5F5F5);
   static const Color _darkSurface = Color(0xFF1A2332);
@@ -49,6 +52,75 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     await _controller!.initialize();
     if (mounted) setState(() => _isCameraReady = true);
   }
+  
+  Future<String> _getDetailedAddress() async {
+  try {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return "GPS Desactivado";
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return "Permiso denegado";
+    }
+
+    Position? position;
+    try {
+      // Intentamos obtener la posición con un poco más de margen
+      position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5), // Aumentado a 5s para mayor precisión
+      );
+    } catch (_) {
+      position = await Geolocator.getLastKnownPosition();
+    }
+
+    if (position == null) return "Ubicación no disponible";
+
+    // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+    List<Placemark> placemarks = [];
+    try {
+      // Aumentamos el timeout a 5 segundos. La geocodificación a veces es lenta.
+      placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      print("Error en Geocoding: $e");
+      // Si falla la conversión, NO retornamos coordenadas, retornamos un texto descriptivo
+      return "Buscando nombre de calle..."; 
+    }
+
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
+      
+      // Prioridad de campos para obtener la dirección más exacta
+      String street = place.thoroughfare ?? ""; // Calle
+      String number = place.subThoroughfare ?? ""; // Número de casa
+      String locality = place.locality ?? ""; // Ciudad/Zona
+      
+      // Si la calle es "Unnamed road" o está vacía, usamos el nombre del lugar
+      if (street.isEmpty || street.toLowerCase().contains("unnamed")) {
+        street = place.name ?? "Calle desconocida";
+      }
+
+      // Construimos una dirección legible: "Calle Falsa 123, Cochabamba"
+      final String fullAddress = [
+        street,
+        number,
+        locality
+      ].where((s) => s.isNotEmpty).join(' ');
+
+      return fullAddress.isNotEmpty ? fullAddress : "Dirección no identificada";
+    }
+
+    // NUNCA retornar coordenadas puras si lo que quieres son calles
+    return "Área sin nombre registrado";
+    
+  } catch (e) {
+    return "Error al obtener dirección";
+  }
+}
 
   Future<void> _toggleFlash() async {
     if (!_isCameraReady) return;
@@ -58,59 +130,96 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   }
 
   Future<void> _quickCapture() async {
-    if (!_isCameraReady || _isProcessing) return;
+  if (!_isCameraReady || _isProcessing) return;
   setState(() => _isProcessing = true);
 
   try {
-    String? finalImagePath;
-    PlateDetection? bestResult;
+    // DISPARAMOS AMBAS TAREAS AL MISMO TIEMPO
+    // La ubicación se busca mientras la cámara toma las fotos
+    final results = await Future.wait([
+      _getDetailedAddress(), // Tarea 0
+      _runDetectionLoop(),    // Tarea 1 (Nueva función abajo)
+    ]);
 
-    for (int i = 0; i < 3; i++) {
-      final XFile photo = await _controller!.takePicture();
-      final result = await _aiService.processStaticImage(photo.path);
-      
-      if (result != null) {
-        bestResult = result;
-        finalImagePath = photo.path; // Guardamos la ruta de la imagen que funcionó
-        break; 
-      }
-      await File(photo.path).delete();
-    }
+    String currentAddress = results[0] as String;
+    Map<String, dynamic>? detectionResult = results[1] as Map<String, dynamic>?;
 
-    if (bestResult != null && finalImagePath != null) {
-      // --- PASO CLAVE: Navegar a la pantalla de confirmación ---
-      final confirmedPlate = await Navigator.push<String>(
+    if (detectionResult != null) {
+      final PlateDetection bestResult = detectionResult['bestResult'];
+      final String finalImagePath = detectionResult['path'];
+
+      final resultData = await Navigator.push<Map<String, String>>(
         context,
         MaterialPageRoute(
           builder: (context) => ConfirmationScreen(
-            plate: bestResult!.plate,
-            imagePath: finalImagePath!,
+            plate: bestResult.plate,
+            imagePath: finalImagePath,
+            location: currentAddress,
           ),
         ),
       );
 
-      // Si el usuario presionó "Confirmar", recibiremos la patente (editada o no)
-      if (confirmedPlate != null) {
-        await _apiRepository.savePlateRecord(confirmedPlate, bestResult.base64Image);
+      if (resultData != null) {
+        // Si ConfirmationScreen ya guardó el registro (saved == true), no volver a guardarlo
+        final alreadySaved = resultData['saved'] == true || resultData['saved'] == 'true';
+        final plateText = resultData['plate'] ?? '';
+        final locationText = resultData['location'] ?? currentAddress;
         
-        // Opcional: Mostrar un pequeño aviso de éxito o ir a la pestaña de registros
-        _tabController.animateTo(1); 
+        print("📋 ConfirmationScreen returned: alreadySaved=$alreadySaved, plate=$plateText, location=$locationText");
+
+        // Crear un registro con los datos correctos
+        // Usar base64Image en lugar de finalImagePath porque el archivo será borrado
+        final PlateRecord newRecord = PlateRecord(
+          id: (resultData['id'] != null) ? int.tryParse(resultData['id'].toString()) ?? 0 : 0,
+          placa: plateText,
+          fecha: DateTime.now(),
+          imagen: bestResult.base64Image, // Usar base64 que se preserva en DB
+          estado: 'VÁLIDO',
+          zona: 'Zona A',
+          supervisor: 'SUPERVISOR 01',
+          ubicacion: locationText,
+        );
+        
+        // Añadir al RecordsScreen mediante la key
+        try {
+          _recordsKey.currentState?.addNewRecord(newRecord);
+          print("✅ Record injected: ${plateText} @ ${locationText}, image: ${bestResult.base64Image.length} bytes");
+        } catch (e) {
+          print("❌ Error injecting record: $e");
+        }
+        
+        // Saltar a pestaña de historial
+        _tabController.animateTo(1);
       }
-      
-      // Limpiar archivo temporal después de usarlo
+
+      // Limpieza
       if (await File(finalImagePath).exists()) {
         await File(finalImagePath).delete();
       }
-
     } else {
-      // ... (Tu SnackBar de error de detección)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No se detectó ninguna placa clara")),
+      );
     }
   } catch (e) {
     print("Error en captura: $e");
   } finally {
     if (mounted) setState(() => _isProcessing = false);
   }
- }
+}
+
+// Función auxiliar para separar la lógica de la cámara
+Future<Map<String, dynamic>?> _runDetectionLoop() async {
+  for (int i = 0; i < 3; i++) {
+    final XFile photo = await _controller!.takePicture();
+    final result = await _aiService.processStaticImage(photo.path);
+    if (result != null) {
+      return {'bestResult': result, 'path': photo.path};
+    }
+    await File(photo.path).delete();
+  }
+  return null;
+}
 
 
   void _showResultDialog(String plate, String imageBase) {
@@ -234,7 +343,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildScannerTab(),
-          RecordsScreen(key: UniqueKey()),
+          RecordsScreen(key: _recordsKey),
         ],
       ),
     );
