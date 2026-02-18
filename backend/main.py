@@ -54,6 +54,17 @@ def init_db():
                 rol VARCHAR(20) NOT NULL
             );
         """)
+        # Nueva tabla 'placas' para almacenar registros desde la app (coincide con campos de Flutter)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS placas (
+                id SERIAL PRIMARY KEY,
+                placa VARCHAR(50) NOT NULL,
+                ubicacion TEXT,
+                imagen_path TEXT,
+                estado VARCHAR(50) DEFAULT 'VÁLIDO',
+                fecha TIMESTAMP DEFAULT now()
+            );
+        """)
         conn.commit()
         print("✅ Base de datos sincronizada correctamente.")
     except Exception as e:
@@ -72,8 +83,9 @@ class LoginRequest(BaseModel):
 class RegistroPlaca(BaseModel):
     plate: str
     base64Image: str
-    latitud: Optional[float] = None
-    longitud: Optional[float] = None
+    location: Optional[str] = None
+    # Añadimos campos opcionales para capturar lo que envíe Flutter con mayor flexibilidad
+    ubicacion: Optional[str] = None
 
 @app.post("/api/login")
 async def login(auth: LoginRequest):
@@ -92,18 +104,35 @@ async def guardar_placa(registro: RegistroPlaca):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO registros (placa, fecha, imagen, latitud, longitud) 
-            VALUES (%s, %s, %s, %s, %s) RETURNING id
-        """, (registro.plate, datetime.now(), registro.base64Image, registro.latitud, registro.longitud))
         
-        nuevo_id = cursor.fetchone()['id']
+        ubicacion_final = registro.location or registro.ubicacion or "Calle desconocida"
+        
+        # Insertamos con el estado correcto
+        cursor.execute("""
+            INSERT INTO placas (placa, ubicacion, imagen_path, estado, fecha) 
+            VALUES (%s, %s, %s, %s, now()) RETURNING id, fecha
+        """, (registro.plate, ubicacion_final, registro.base64Image, 'VÁLIDO'))
+        
+        result = cursor.fetchone()
+        nuevo_id = result['id']
+        fecha_server = result['fecha']
         conn.commit()
-        print(f"🚀 PLACA GUARDADA EN DB: {registro.plate}")
-        return {"status": "success", "id": nuevo_id}
+        
+        # DEVOLVEMOS TODO EL OBJETO para que Flutter lo agregue a la lista sin recargar
+        return {
+            "status": "success", 
+            "id": nuevo_id, 
+            "placa": registro.plate,
+            "ubicacion": ubicacion_final,
+            "imagen": registro.base64Image,
+            "estado": "VÁLIDO",
+            "fecha": fecha_server.isoformat(),
+            "zona": "Zona A",
+            "supervisor": "ADMIN"
+        }
     except Exception as e:
         if conn: conn.rollback()
-        print(f"❌ ERROR AL GUARDAR: {e}")
+        print(f"❌ ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
@@ -112,10 +141,28 @@ async def guardar_placa(registro: RegistroPlaca):
 async def get_all_registros():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM registros ORDER BY fecha DESC")
-    datos = cursor.fetchall()
-    conn.close()
-    return datos
+    try:
+        # Traemos todos los datos asegurando que el Base64 se llame 'imagen' para el frontend
+        cursor.execute("""
+            SELECT id, placa, imagen_path as imagen, ubicacion, estado, fecha 
+            FROM placas 
+            ORDER BY fecha DESC
+        """)
+        datos = cursor.fetchall()
+        conn.close()
+        
+        # Formatear para el frontend
+        for row in datos:
+            row['zona'] = 'Zona A'
+            row['supervisor'] = 'ADMIN'
+            # Si la ubicación en DB quedó nula por error previo, corregir al vuelo
+            if not row.get('ubicacion'):
+                row['ubicacion'] = 'Calle desconocida'
+                
+        return datos
+    except Exception as e:
+        print(f"❌ Error al obtener registros: {e}")
+        return []
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
