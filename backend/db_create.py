@@ -4,7 +4,7 @@ import os
 
 # Configuramos tus datos reales
 DB_USER = "postgres"
-DB_PASS = "1234"
+DB_PASS = "123"
 DB_HOST = "localhost"
 DB_PORT = "5432"
 DB_NAME = "multasplacas" # El nombre que tú elegiste
