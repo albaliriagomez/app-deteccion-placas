@@ -21,6 +21,9 @@ dependencies:
   flutter_vision: ^1.1.4 
   image: ^4.1.7
   http: ^1.2.0
+
+  geolocator: 11.0.0
+  geocoding: ^3.0.0
   
   # NOTA: No agregamos 'google_mlkit_commons' manualmente
   # para evitar el error de conflicto que te salió antes.
