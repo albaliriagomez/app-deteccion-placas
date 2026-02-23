@@ -312,32 +312,7 @@ Future<Map<String, dynamic>?> _runDetectionLoop() async {
 
     return Scaffold(
       backgroundColor: isDark ? _darkBg : _lightBg,
-      appBar: AppBar(
-        title: Text(
-          "License Plate Scanner",
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            letterSpacing: 0.5,
-          ),
-        ),
-        backgroundColor: isDark ? _darkSurface : Colors.white,
-        elevation: 8,
-        shadowColor: _neonCyan.withOpacity(0.3),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: _neonCyan,
-          indicatorWeight: 3,
-          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          labelColor: _neonCyan,
-          unselectedLabelColor: isDark ? Colors.white54 : Colors.grey,
-          tabs: const [
-            Tab(icon: Icon(Icons.camera_alt), text: "ESCANER"),
-            Tab(icon: Icon(Icons.list_alt), text: "REGISTROS"),
-          ],
-        ),
-      ),
+      
       body: TabBarView(
         controller: _tabController,
         physics: const NeverScrollableScrollPhysics(),
