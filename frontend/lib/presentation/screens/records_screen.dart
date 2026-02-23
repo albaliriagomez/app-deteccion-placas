@@ -26,74 +26,88 @@ class RecordsScreenState extends State<RecordsScreen> {
   static const Color _white = Color(0xFFFFFFFF);
 
   // --- VARIABLES DE ESTADO ---
-  late Future<List<PlateRecord>> _recordsFuture;
   final ApiRepository _apiRepository = ApiRepository();
   final TextEditingController _searchController = TextEditingController();
   
-  final List<PlateRecord> _injectedRecords = [];
-  String _selectedTimeFilter = 'Hoy';
-  List<PlateRecord> _filteredRecords = [];
-  List<PlateRecord> _allRecords = [];
+  List<PlateRecord> _allRecords = []; // Base de datos local (memoria)
+  List<PlateRecord> _filteredRecords = []; // Lo que se muestra
+  bool _isLoading = true;
+  String _selectedTimeFilter = 'Todos'; // Cambiado a 'Todos' por defecto
 
   @override
   void initState() {
     super.initState();
-    _loadRecords();
-    _searchController.addListener(_filterRecords);
+    _loadRecords(); // Se llama SOLO una vez
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  void _loadRecords() {
+  void addNewRecord(PlateRecord newRecord) {
     setState(() {
-      _recordsFuture = _apiRepository.getPlateRecords();
+      // Insertamos al principio de la lista local
+      _allRecords.insert(0, newRecord);
+      // Re-aplicamos filtros para que aparezca en pantalla inmediatamente
+      _applyFilters();
     });
   }
 
-  void addNewRecord(PlateRecord record) {
-    setState(() {
-      _injectedRecords.insert(0, record);
-      _allRecords.insert(0, record);
-      _filterRecords();
-    });
+  // Carga inicial desde el servidor
+  Future<void> _loadRecords() async {
+    setState(() => _isLoading = true);
+    try {
+      final records = await _apiRepository.getPlateRecords();
+      setState(() {
+        _allRecords = records;
+        _filteredRecords = records;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showSnackBarError("Error al conectar con el servidor");
+    }
   }
 
-  void _filterRecords() {
+  void _onSearchChanged() {
+    _applyFilters();
+  }
+
+  // Función única de filtrado (Velocidad instantánea)
+  void _applyFilters() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredRecords = _allRecords
-          .where((record) => record.placa.toLowerCase().contains(query))
-          .toList();
-    });
-  }
-
-  void _applyTimeFilter(String filter) {
-    setState(() {
-      _selectedTimeFilter = filter;
       _filteredRecords = _allRecords.where((record) {
+        final matchesSearch = record.placa.toLowerCase().contains(query);
         final now = DateTime.now();
         final recordDate = record.fecha;
         
-        switch (filter) {
-          case 'Hoy':
-            return recordDate.year == now.year &&
-                recordDate.month == now.month &&
-                recordDate.day == now.day;
-          case 'Esta semana':
-            final weekAgo = now.subtract(const Duration(days: 7));
-            return recordDate.isAfter(weekAgo) && recordDate.isBefore(now.add(const Duration(days: 1)));
-          case 'Mes':
-            final monthAgo = now.subtract(const Duration(days: 30));
-            return recordDate.isAfter(monthAgo) && recordDate.isBefore(now.add(const Duration(days: 1)));
-          default:
-            return true;
+        bool matchesTime = true;
+        if (_selectedTimeFilter == 'Hoy') {
+          matchesTime = recordDate.year == now.year &&
+              recordDate.month == now.month &&
+              recordDate.day == now.day;
+        } else if (_selectedTimeFilter == 'Esta semana') {
+          final weekAgo = now.subtract(const Duration(days: 7));
+          matchesTime = recordDate.isAfter(weekAgo);
+        } else if (_selectedTimeFilter == 'Mes') {
+          final monthAgo = now.subtract(const Duration(days: 30));
+          matchesTime = recordDate.isAfter(monthAgo);
         }
+
+        return matchesSearch && matchesTime;
       }).toList();
     });
+  }
+
+  void _showSnackBarError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: _errorRed),
+    );
   }
 
   @override
@@ -103,27 +117,15 @@ class RecordsScreenState extends State<RecordsScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF1A1A1A) : _lightGray,
       appBar: _buildAppBar(isDark),
-      body: FutureBuilder<List<PlateRecord>>(
-        future: _recordsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: _darkPurple));
-          } else if (snapshot.hasError) {
-            return _buildErrorState();
-          } else if (!snapshot.hasData || (snapshot.data!.isEmpty && _injectedRecords.isEmpty)) {
-            return _buildEmptyState();
-          } else {
-            _allRecords = [..._injectedRecords, ...snapshot.data!];
-            if (_filteredRecords.isEmpty && _searchController.text.isEmpty) {
-              _filteredRecords = _allRecords;
-            }
-            
-            return RefreshIndicator(
-              color: _darkPurple,
-              onRefresh: () async => _loadRecords(),
-              child: ListView(
-                children: [
-                  Padding(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: _darkPurple))
+        : RefreshIndicator(
+            onRefresh: _loadRecords,
+            color: _darkPurple,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,79 +136,55 @@ class RecordsScreenState extends State<RecordsScreen> {
                       ],
                     ),
                   ),
-                  _filteredRecords.isEmpty
-                      ? _buildNoResultsFound()
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _filteredRecords.length,
-                          itemBuilder: (context, index) {
-                            return _buildRecordCard(_filteredRecords[index], isDark);
-                          },
+                ),
+                _filteredRecords.isEmpty
+                    ? SliverFillRemaining(child: _buildEmptyState())
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _buildRecordCard(_filteredRecords[index], isDark),
+                          childCount: _filteredRecords.length,
                         ),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            );
-          }
-        },
-      ),
+                      ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              ],
+            ),
+          ),
       floatingActionButton: _buildFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
-  // --- COMPONENTES DE INTERFAZ ---
+  // --- COMPONENTES ---
 
   AppBar _buildAppBar(bool isDark) {
     return AppBar(
       backgroundColor: isDark ? const Color(0xFF2A2A2A) : _white,
       elevation: 2,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: _darkPurple),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Text(
-        'HISTORIAL DE VERIFICACIÓN',
-        style: GoogleFonts.poppins(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: _darkPurple,
-          letterSpacing: 0.5,
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.tune, color: _darkPurple),
-          onPressed: () {},
-        ),
-      ],
+      automaticallyImplyLeading: false,
+      title: Text('HISTORIAL', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: _darkPurple)),
     );
   }
 
   Widget _buildTimeFilters(bool isDark) {
-    final filters = ['Hoy', 'Esta semana', 'Mes'];
+    final filters = ['Todos', 'Hoy', 'Esta semana', 'Mes'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: filters.map((filter) => Padding(
-          padding: const EdgeInsets.only(right: 12.0),
-          child: GestureDetector(
-            onTap: () => _applyTimeFilter(filter),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _selectedTimeFilter == filter ? _darkPurple : (isDark ? const Color(0xFF3A3A3A) : _mediumGray),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                filter,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _selectedTimeFilter == filter ? _white : _darkGray,
-                ),
-              ),
+          padding: const EdgeInsets.only(right: 8.0),
+          child: ChoiceChip(
+            label: Text(filter),
+            selected: _selectedTimeFilter == filter,
+            onSelected: (val) {
+              if (val) {
+                setState(() => _selectedTimeFilter = filter);
+                _applyFilters();
+              }
+            },
+            selectedColor: _darkPurple,
+            labelStyle: GoogleFonts.poppins(
+              color: _selectedTimeFilter == filter ? Colors.white : Colors.black,
+              fontSize: 12,
             ),
           ),
         )).toList(),
@@ -215,129 +193,68 @@ class RecordsScreenState extends State<RecordsScreen> {
   }
 
   Widget _buildSearchBar(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF3A3A3A) : _white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _mediumGray, width: 1),
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: GoogleFonts.poppins(fontSize: 14, color: isDark ? _white : Colors.black),
-        decoration: InputDecoration(
-          hintText: 'Buscar patente...',
-          hintStyle: GoogleFonts.poppins(fontSize: 14, color: _darkGray),
-          prefixIcon: const Icon(Icons.search, color: _darkGray),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Buscar patente...',
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF3A3A3A) : _white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
       ),
     );
   }
 
   Widget _buildRecordCard(PlateRecord record, bool isDark) {
     final isValid = record.estado == 'VÁLIDO';
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
-      ),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2A2A) : _white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2))],
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(
-                width: 56, height: 56,
-                decoration: BoxDecoration(color: isValid ? _successGreen : _errorRed, shape: BoxShape.circle),
-                child: Icon(isValid ? Icons.check : Icons.gavel, color: _white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(record.placa, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? _white : Colors.black)),
-                    Text(_formatDateTime(record.fecha), style: GoogleFonts.poppins(fontSize: 12, color: _darkGray)),
-                    Text('${record.zona} • ${record.ubicacion}', style: GoogleFonts.poppins(fontSize: 11, color: _darkGray), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: (isValid ? _successGreen : _errorRed).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(record.estado, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w700, color: isValid ? _successGreen : _errorRed)),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(record.supervisor, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _darkGray)),
-                ],
-              ),
-            ],
-          ),
+        leading: CircleAvatar(
+          backgroundColor: isValid ? _successGreen : _errorRed,
+          child: Icon(isValid ? Icons.check : Icons.warning, color: Colors.white),
         ),
+        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('${record.ubicacion}\n${_formatDateTime(record.fecha)}'),
+        trailing: const Icon(Icons.chevron_right),
+        isThreeLine: true,
       ),
     );
   }
 
   Widget _buildFAB() {
-    return FloatingActionButton(
-      onPressed: () => Navigator.pop(context),
+    // Si esta pantalla es una pestaña, el botón debería cerrar o cambiar de tab
+    return FloatingActionButton.extended(
+      onPressed: () {
+        // Esto asume que quieres volver al escáner si está en un Navigator
+        // Si quieres que cambie de pestaña, podrías pasarle un callback
+        if (Navigator.canPop(context)) Navigator.pop(context);
+      },
       backgroundColor: _darkPurple,
-      child: const Icon(Icons.qr_code_scanner, color: _white, size: 28),
+      icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+      label: const Text("ESCANEAR", style: TextStyle(color: Colors.white)),
     );
   }
-
-  // --- HELPERS ---
 
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.receipt_long, size: 80, color: _mediumGray),
-          Text('Sin registros disponibles', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: _darkGray)),
+          const Icon(Icons.search_off, size: 60, color: Colors.grey),
+          const SizedBox(height: 10),
+          Text('No se encontraron registros', style: GoogleFonts.poppins(color: Colors.grey)),
         ],
       ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 80, color: _errorRed),
-          Text('Error al cargar registros', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: _darkGray)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoResultsFound() {
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Center(child: Text('No se encontraron resultados', style: GoogleFonts.poppins(fontSize: 14, color: _darkGray))),
     );
   }
 
   String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final recordDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-    final today = DateTime(now.year, now.month, now.day);
-    
-    String dayLabel = (recordDate == today) ? 'Hoy' : '${recordDate.day}/${recordDate.month}/${recordDate.year}';
-    return '$dayLabel • ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '${dateTime.day}/${dateTime.month} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -25,9 +25,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // ⚠️ Cambia esta IP por la IP de tu PC donde corre el backend
       final response = await http.post(
-        Uri.parse('http://192.168.1.20:8000/api/login'),
+        Uri.parse('http://192.168.31.11:8000/api/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _userController.text.trim(),
@@ -36,11 +35,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        // Si luego quieres usar estos datos, ya están:
-        // final data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        String tokenSem = data['sem_token']; // <--- AQUÍ TIENES EL TOKEN
+        
+        // Aquí puedes guardar el token para usarlo en la pantalla de escaneo
+        print("Token recibido del SEM: $tokenSem");
 
         if (!mounted) return;
-        // ✅ Ir al AppShell (Drawer / menú lateral)
         Navigator.pushReplacementNamed(context, '/app');
       } else {
         _showError("Usuario o contraseña incorrectos");
