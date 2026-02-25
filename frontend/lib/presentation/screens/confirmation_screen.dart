@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/api_repository.dart';
@@ -6,14 +6,20 @@ import 'dart:convert';
 
 class ConfirmationScreen extends StatefulWidget {
   final String plate;
-  final String imagePath;
+  final String base64Image; // ← ahora recibe base64, no path
   final String location;
+  final String latitude;
+  final String longitude;
+  final String hora;
 
   const ConfirmationScreen({
     super.key,
     required this.plate,
-    required this.imagePath,
+    required this.base64Image,
     required this.location,
+    required this.latitude,
+    required this.longitude,
+    required this.hora,
   });
 
   @override
@@ -24,20 +30,25 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   late TextEditingController _plateController;
   final ApiRepository _apiRepository = ApiRepository();
   bool _isSaving = false;
+
   // Colores
-  static const Color _darkPurple = Color(0xFF311B92);
+  static const Color _darkPurple  = Color(0xFF311B92);
   static const Color _successGreen = Color(0xFF8BC34A);
-  static const Color _lightGray = Color(0xFFF5F5F5);
-  static const Color _mediumGray = Color(0xFFE0E0E0);
-  static const Color _darkGray = Color(0xFF757575);
-  static const Color _white = Color(0xFFFFFFFF);
+  static const Color _lightGray   = Color(0xFFF5F5F5);
+  static const Color _mediumGray  = Color(0xFFE0E0E0);
+  static const Color _darkGray    = Color(0xFF757575);
+  static const Color _white       = Color(0xFFFFFFFF);
 
   bool _isEditing = false;
+
+  // Bytes de la imagen decodificados una sola vez
+  late final Uint8List _imageBytes;
 
   @override
   void initState() {
     super.initState();
     _plateController = TextEditingController(text: widget.plate);
+    _imageBytes = base64Decode(widget.base64Image);
   }
 
   @override
@@ -46,6 +57,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -80,6 +92,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: _white,
@@ -100,6 +113,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
   Widget _buildProgressIndicator() {
     return Center(
       child: Container(
@@ -111,80 +125,47 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: _darkPurple,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '1',
-                  style: GoogleFonts.poppins(
-                    color: _white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 40,
-              height: 2,
-              color: _darkPurple,
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: _darkPurple,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '2',
-                  style: GoogleFonts.poppins(
-                    color: _white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 40,
-              height: 2,
-              color: _mediumGray,
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: _mediumGray,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '3',
-                  style: GoogleFonts.poppins(
-                    color: _darkGray,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
+            _stepCircle('1', filled: true),
+            _stepLine(filled: true),
+            _stepCircle('2', filled: true),
+            _stepLine(filled: false),
+            _stepCircle('3', filled: false),
           ],
         ),
       ),
     );
   }
 
+  Widget _stepCircle(String label, {required bool filled}) {
+    return Container(
+      width: 32, height: 32,
+      decoration: BoxDecoration(
+        color: filled ? _darkPurple : _mediumGray,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: filled ? _white : _darkGray,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stepLine({required bool filled}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Container(width: 40, height: 2, color: filled ? _darkPurple : _mediumGray),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Imagen desde bytes en memoria — no necesita File en disco
+  // ─────────────────────────────────────────────────────────────
   Widget _buildCapturedImage() {
     return Center(
       child: Container(
@@ -202,33 +183,25 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
         ),
         child: Stack(
           children: [
-            // Imagen capturada
+            // ← Image.memory en lugar de Image.file
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.file(
-                File(widget.imagePath),
+              child: Image.memory(
+                _imageBytes,
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
               ),
             ),
-            // Overlay gris semi-transparente
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Container(
-                color: Colors.black.withOpacity(0.15),
-              ),
+              child: Container(color: Colors.black.withOpacity(0.15)),
             ),
-            // Marco guía en el centro
             Center(
               child: Container(
-                width: 200,
-                height: 100,
+                width: 200, height: 100,
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _white,
-                    width: 2,
-                  ),
+                  border: Border.all(color: _white, width: 2),
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -239,21 +212,17 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
   Widget _buildPlateEditField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Etiqueta y estado
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'Número de patente',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: _darkGray,
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: _darkGray),
             ),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
@@ -264,35 +233,23 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
               child: Text(
                 'LECTURA EXITOSA',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _successGreen,
-                  letterSpacing: 0.5,
+                  fontSize: 12, fontWeight: FontWeight.w600,
+                  color: _successGreen, letterSpacing: 0.5,
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        // TextField estilizado
         Material(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: _white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _isEditing ? _darkPurple : _mediumGray,
-                width: 2,
-              ),
+              border: Border.all(color: _isEditing ? _darkPurple : _mediumGray, width: 2),
               boxShadow: _isEditing
-                  ? [
-                      BoxShadow(
-                        color: _darkPurple.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
+                  ? [BoxShadow(color: _darkPurple.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))]
                   : null,
             ),
             child: Row(
@@ -304,18 +261,12 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                     onSubmitted: (_) => setState(() => _isEditing = false),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: _darkPurple,
-                      letterSpacing: 1.5,
+                      fontSize: 32, fontWeight: FontWeight.w700,
+                      color: _darkPurple, letterSpacing: 1.5,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Patente',
-                      hintStyle: GoogleFonts.poppins(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                        color: _mediumGray,
-                      ),
+                      hintStyle: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.w700, color: _mediumGray),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -326,15 +277,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                   onTap: () => setState(() => _isEditing = !_isEditing),
                   child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _darkPurple.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.edit,
-                      color: _darkPurple,
-                      size: 20,
-                    ),
+                    decoration: BoxDecoration(color: _darkPurple.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.edit, color: _darkPurple, size: 20),
                   ),
                 ),
               ],
@@ -345,15 +289,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
   Widget _buildHelpText() {
     return Text(
       'Revise el texto. Puede editarlo si hubo un error en el escaneo.',
-      style: GoogleFonts.poppins(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        color: _darkGray,
-        height: 1.5,
-      ),
+      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w400, color: _darkGray, height: 1.5),
     );
   }
 
@@ -369,10 +309,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _darkPurple.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: _darkPurple.withOpacity(0.1), shape: BoxShape.circle),
             child: const Icon(Icons.location_on, color: _darkPurple, size: 20),
           ),
           const SizedBox(width: 12),
@@ -380,15 +317,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ubicación detectada',
-                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: _darkGray),
-                ),
+                Text('Ubicación detectada',
+                    style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: _darkGray)),
                 const SizedBox(height: 4),
-                Text(
-                  widget.location, // <--- CAMBIO: Usamos la ubicación real
-                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: _darkPurple),
-                ),
+                Text(widget.location,
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: _darkPurple)),
               ],
             ),
           ),
@@ -397,70 +330,16 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
-        // Botón Confirmar con Bloqueo de Seguridad
         AbsorbPointer(
-          absorbing: _isSaving, // Evita clics extra a nivel de widget
+          absorbing: _isSaving,
           child: Opacity(
             opacity: _isSaving ? 0.6 : 1.0,
-            child: ElevatedButton( // Cambiado a ElevatedButton para mejor manejo de estado
-              onPressed: _isSaving ? null : () async {
-                setState(() => _isSaving = true);
-                
-                try {
-                  // 1. Conversión de Imagen
-                  final bytes = await File(widget.imagePath).readAsBytes();
-                  String base64Image = base64Encode(bytes);
-                  
-                  final plateText = _plateController.text.toUpperCase().trim();
-                  // Aseguramos que la ubicación no sea nula o vacía antes de enviar
-                  final locationText = widget.location.isNotEmpty ? widget.location : "Calle desconocida";
-
-                  // 2. Llamada al API con Timeout
-                  final result = await _apiRepository.savePlateRecord(
-                    plateText, 
-                    base64Image, 
-                    location: locationText,
-                  ).timeout(const Duration(seconds: 15));
-
-                  if (!mounted) return;
-
-                  if (result['success'] == true) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Registro guardado correctamente'),
-                        backgroundColor: _successGreen,
-                      ),
-                    );
-                    
-                    // IMPORTANTE: Primero limpiamos el estado
-                    setState(() => _isSaving = false); 
-
-                    // Agregamos un delay pequeño para que el Navigator no choque con el SnackBar
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
-                        // Usamos pushNamedAndRemoveUntil para limpiar la pila y refrescar el historial
-                        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                      }
-                    });
-                  } else {
-                    throw Exception(result['error'] ?? 'Error del servidor');
-                  }
-                } catch (e) {
-                  print("❌ Error en guardado: $e");
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('❌ Error: ${e.toString()}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    setState(() => _isSaving = false);
-                  }
-                }
-              },
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _onConfirm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _darkPurple,
                 minimumSize: const Size(double.infinity, 56),
@@ -470,9 +349,12 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (_isSaving) 
-                    const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  else 
+                  if (_isSaving)
+                    const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  else
                     const Icon(Icons.check_circle, color: Colors.white),
                   const SizedBox(width: 12),
                   Text(
@@ -485,7 +367,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Botón Volver (solo activo si no estamos guardando)
         if (!_isSaving)
           OutlinedButton(
             onPressed: () => Navigator.pop(context),
@@ -501,5 +382,52 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
           ),
       ],
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Guardar: usa base64Image ya en memoria, sin leer File
+  // ─────────────────────────────────────────────────────────────
+  Future<void> _onConfirm() async {
+    setState(() => _isSaving = true);
+    try {
+      final plateText    = _plateController.text.toUpperCase().trim();
+      final locationText = widget.location.isNotEmpty ? widget.location : 'Calle desconocida';
+
+      final result = await _apiRepository.savePlateRecord(
+        plateText,
+        widget.base64Image, // ← directo, sin re-leer archivo
+        location:  locationText,
+        latitude:  widget.latitude,
+        longitude: widget.longitude,
+        hora:      widget.hora,
+      ).timeout(const Duration(seconds: 15));
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Registro guardado correctamente'),
+            backgroundColor: _successGreen,
+          ),
+        );
+        setState(() => _isSaving = false);
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+          }
+        });
+      } else {
+        throw Exception(result['error'] ?? 'Error del servidor');
+      }
+    } catch (e) {
+      print('❌ Error en guardado: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isSaving = false);
+      }
+    }
   }
 }

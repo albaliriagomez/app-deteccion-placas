@@ -40,32 +40,38 @@ async def get_all_registros():
         conn.close()
 
 @router.post("/registros")
-async def guardar_placa(registro: RegistroPlaca):
+async def guardar_placa(data: dict): # <--- Cambiamos RegistroPlaca por dict
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # 4. Lógica de ubicación (Igual al tuyo)
-        ubicacion_final = registro.location or registro.ubicacion or "Calle desconocida"
-        
-        # 5. Insert con RETURNING exacto (Igual al tuyo)
+        # Extraemos con .get() para que no explote si falta algo
+        placa = data.get('placa') or data.get('plate')
+        ubicacion = data.get('ubicacion') or data.get('location') or "Sin ubicación"
+        lat = data.get('latitude') or "0.0"
+        lon = data.get('longitude') or "0.0"
+        imagen = data.get('base64Image') or data.get('imagen_path')
+
+        if not placa:
+            raise HTTPException(status_code=400, detail="La placa es obligatoria")
+
         query = """
-            INSERT INTO placas (placa, ubicacion, imagen_path, estado, fecha) 
-            VALUES (%s, %s, %s, 'VÁLIDO', NOW()) 
-            RETURNING id, placa, ubicacion, imagen_path AS imagen, estado, fecha
+            INSERT INTO placas (placa, ubicacion, latitude, longitude, imagen_path, estado, fecha) 
+            VALUES (%s, %s, %s, %s, %s, 'VÁLIDO', NOW()) 
+            RETURNING id, placa, ubicacion, latitude, longitude, imagen_path AS imagen, estado, fecha
         """
-        cursor.execute(query, (registro.plate, ubicacion_final, registro.base64Image))
+        cursor.execute(query, (placa, ubicacion, lat, lon, imagen))
         nuevo = cursor.fetchone()
         conn.commit()
         
-        # 6. Mapeo final de campos para Flutter (Igual al tuyo)
         nuevo['fecha'] = nuevo['fecha'].isoformat()
         nuevo['zona'] = 'Zona A'
         nuevo['supervisor'] = 'ADMIN'
         
-        return nuevo # Devolvemos el diccionario plano
+        print(f"✅ Registro guardado: {placa}")
+        return nuevo 
     except Exception as e:
         conn.rollback()
-        print(f"❌ ERROR: {e}")
+        print(f"❌ ERROR EN POST: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
