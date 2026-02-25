@@ -6,7 +6,9 @@ class LoginRequest(BaseModel):
     password: str
 
 class RegistroPlaca(BaseModel):
-    plate: str
-    base64Image: str
-    location: Optional[str] = None
-    ubicacion: Optional[str] = None
+    placa: str                
+    base64Image: str          
+    ubicacion: Optional[str] = None 
+    latitude: Optional[str] = "0.0"
+    longitude: Optional[str] = "0.0"
+    hora: Optional[str] = None

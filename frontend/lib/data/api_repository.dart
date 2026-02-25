@@ -47,15 +47,25 @@ class PlateRecord {
 
 class ApiRepository {
   // RECUERDA: Asegúrate de que esta IP coincida con la de tu servidor actual
-  static const String _baseUrl = 'http://192.168.31.11:8000'; 
+  static const String _baseUrl = 'http://10.1.50.165:8000'; 
 
-  Future<Map<String, dynamic>> savePlateRecord(String plate, String imageBase64, {String? location}) async {
+  Future<Map<String, dynamic>> savePlateRecord(
+    String plate, 
+    String imageBase64, {
+    String? location,
+    String? latitude,  
+    String? longitude,
+    String? hora,      
+  }) async {
     try {
       // Preparamos el cuerpo exactamente como lo espera el esquema RegistroPlaca de FastAPI
       final body = {
-        "plate": plate,
+        "placa": plate,
         "base64Image": imageBase64,
-        "location": location ?? "Calle desconocida",
+        "ubicacion": location,
+        "latitude": latitude.toString(), // Asegurar que sea String
+        "longitude": longitude.toString(), // Asegurar que sea String
+        "hora": hora,
       };
 
       print("📤 Enviando datos al servidor...");

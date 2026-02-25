@@ -44,6 +44,8 @@ def init_system():
                 id SERIAL PRIMARY KEY,
                 placa VARCHAR(50) NOT NULL,
                 ubicacion TEXT,
+                latitude VARCHAR(50),
+                longitude VARCHAR(50),
                 imagen_path TEXT, 
                 estado VARCHAR(50) DEFAULT 'VÁLIDO',
                 fecha TIMESTAMP DEFAULT now()
