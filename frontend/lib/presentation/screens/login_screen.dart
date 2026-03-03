@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/session_manager.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _login() async {
-    if (_userController.text.trim().isEmpty || _passController.text.isEmpty) {
+    if (_userController.text.trim().isEmpty ||
+        _passController.text.isEmpty) {
       _showError("Por favor llene todos los campos");
       return;
     }
@@ -26,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.1.50.165:8000/api/login'),
+        Uri.parse('http://192.168.31.119:8000/api/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _userController.text.trim(),
@@ -36,12 +38,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String tokenSem = data['sem_token']; // <--- AQUÍ TIENES EL TOKEN
-        
-        // Aquí puedes guardar el token para usarlo en la pantalla de escaneo
-        print("Token recibido del SEM: $tokenSem");
+
+        // 🔐 Guardamos el token y datos en memoria global
+        SessionManager.semToken = data['sem_token'];
+        SessionManager.username = data['username'];
+        SessionManager.role = data['role'];
+
+        print("Token guardado correctamente:");
+        print(SessionManager.semToken);
 
         if (!mounted) return;
+
         Navigator.pushReplacementNamed(context, '/app');
       } else {
         _showError("Usuario o contraseña incorrectos");
@@ -79,7 +86,6 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               children: [
-                // LOGO estilo (como lo tenías)
                 Container(
                   width: 100,
                   height: 100,
@@ -119,7 +125,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // INPUT USUARIO
                 _buildInput(
                   controller: _userController,
                   hint: "ej. supervisor_01",
@@ -128,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // INPUT CONTRASEÑA
                 _buildInput(
                   controller: _passController,
                   hint: "••••••••",
@@ -152,7 +156,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // BOTÓN INGRESAR
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -185,14 +188,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                              const Icon(Icons.arrow_forward,
+                                  color: Colors.white, size: 20),
                             ],
                           ),
                   ),
                 ),
 
                 const SizedBox(height: 30),
-                const Text("O ACCEDER CON", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                const Text("O ACCEDER CON",
+                    style: TextStyle(fontSize: 10, color: Colors.grey)),
                 const SizedBox(height: 20),
 
                 Row(
@@ -239,8 +244,11 @@ class _LoginScreenState extends State<LoginScreen> {
             prefixIcon: Icon(icon, color: Colors.grey),
             suffixIcon: isPass
                 ? IconButton(
-                    icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(_obscure
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    onPressed: () =>
+                        setState(() => _obscure = !_obscure),
                   )
                 : null,
             filled: true,
