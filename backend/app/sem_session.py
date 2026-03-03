@@ -1,0 +1,3 @@
+SEM_ACTIVE_TOKEN = None
+SEM_EMAIL = None
+SEM_PASSWORD = None
