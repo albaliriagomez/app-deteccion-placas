@@ -6,7 +6,7 @@ import os
 DB_CONFIG = {
     "dbname": "multasplacas",
     "user": "postgres",
-    "password": "123",
+    "password": "1234",
     "host": os.getenv("DB_HOST", "localhost"),
     "port": "5432"
 }

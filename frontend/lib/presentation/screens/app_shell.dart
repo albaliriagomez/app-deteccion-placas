@@ -24,7 +24,9 @@ class _AppShellState extends State<AppShell> {
       case 1:
         return const ScannerScreen();
       case 2:
-        return const RecordsScreen();
+        return RecordsScreen(
+          onNavigateToScanner: () => setState(() => _index = 1),
+        );
       case 3:
         return const MapPlaceholderScreen();
       default:

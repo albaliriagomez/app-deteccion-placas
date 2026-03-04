@@ -4,7 +4,7 @@ import 'session_manager.dart';
 
 class NotificacionService {
 
-  static const String baseUrl = "http://192.168.31.119:8000/api"; // TU IP
+  static const String baseUrl = "http://192.168.0.15:8000/api"; // TU IP
 
   static Future<void> enviarNotificacion({
     required String patente,
