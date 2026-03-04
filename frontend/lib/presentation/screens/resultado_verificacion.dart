@@ -18,65 +18,77 @@ class ResultadoVerificacionScreen extends StatelessWidget {
     final bool pagoVigente = estado == "VÁLIDO";
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF8FAFF), // Fondo más claro y moderno
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           "VERIFICACIÓN",
           style: GoogleFonts.poppins(
-            color: const Color(0xFF4A2E8E),
-            fontWeight: FontWeight.w600,
+            color: const Color(0xFF2D2D5E),
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            letterSpacing: 1.2,
           ),
         ),
-        iconTheme: const IconThemeData(color: Color(0xFF4A2E8E)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, size: 26),
+            onPressed: () {}, // Lógica de historial si fuera necesaria
+          ),
+          const SizedBox(width: 8),
+        ],
+        iconTheme: const IconThemeData(color: Color(0xFF2D2D5E)),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            /// TARJETA PRINCIPAL
+            /// TARJETA PRINCIPAL (PATENTE Y ESTADO)
             Container(
-              padding: const EdgeInsets.all(25),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
+                borderRadius: BorderRadius.circular(35),
                 boxShadow: [
                   BoxShadow(
-                    blurRadius: 10,
-                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                    color: const Color(0xFF4A2E8E).withOpacity(0.05),
                   )
                 ],
               ),
               child: Column(
                 children: [
-
                   Text(
                     "PATENTE",
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.withOpacity(0.8),
+                      letterSpacing: 2,
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
+                  const SizedBox(height: 8),
                   Text(
                     registro["placa"],
                     style: GoogleFonts.poppins(
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2C2F3A),
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1A1C24),
+                      letterSpacing: -1,
                     ),
                   ),
-
-                  const SizedBox(height: 15),
-
+                  const SizedBox(height: 25),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     decoration: BoxDecoration(
                       color: pagoVigente
                           ? const Color(0xFFE8F5E9)
@@ -87,24 +99,17 @@ class ResultadoVerificacionScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          pagoVigente
-                              ? Icons.check_circle
-                              : Icons.warning,
-                          color: pagoVigente
-                              ? Colors.green
-                              : Colors.red,
-                          size: 18,
+                          pagoVigente ? Icons.check_circle : Icons.error_outline,
+                          color: pagoVigente ? Colors.green : Colors.red,
+                          size: 22,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 10),
                         Text(
-                          pagoVigente
-                              ? "Pago vigente"
-                              : "Infracción detectada",
+                          pagoVigente ? "Pago vigente" : "Sin pago activo",
                           style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            color: pagoVigente
-                                ? Colors.green
-                                : Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: pagoVigente ? Colors.green : Colors.red,
                           ),
                         ),
                       ],
@@ -114,31 +119,47 @@ class ResultadoVerificacionScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 35),
+            
+            Text(
+              "DETALLES DEL REGISTRO",
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.blueGrey.withOpacity(0.6),
+                letterSpacing: 0.5,
+              ),
+            ),
+            
+            const SizedBox(height: 15),
 
-            _detailTile(Icons.calendar_today,
-                "Fecha", registro["fecha"].toString().substring(0, 10)),
+            _detailTile(
+              Icons.calendar_today_outlined,
+              "FECHA",
+              registro["fecha"].toString().substring(0, 10),
+            ),
 
-            _detailTile(Icons.access_time,
-                "Hora de consulta",
-                parking != null
-                    ? parking["hour_end"]
-                    : "Sin registro"),
+            _detailTile(
+              Icons.access_time_rounded,
+              "HORA DE CONSULTA",
+              parking != null ? parking["hour_end"] : "Sin registro",
+            ),
 
-            _detailTile(Icons.location_on,
-                "Ubicación", registro["ubicacion"]),
+            _detailTile(
+              Icons.location_on_outlined,
+              "UBICACIÓN",
+              registro["ubicacion"],
+            ),
 
-            const Spacer(),
+            const SizedBox(height: 40),
 
+            /// BOTONES DE ACCIÓN
             ElevatedButton(
               onPressed: () {
-
                 if (pagoVigente) {
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const ScannerScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ScannerScreen()),
                     (route) => false,
                   );
                 } else {
@@ -147,31 +168,54 @@ class ResultadoVerificacionScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const InfraccionRegistradaScreen(),
                       settings: RouteSettings(
-                        arguments: {
-                          "registro": registro,
-                        },
+                        arguments: {"registro": registro},
                       ),
                     ),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A2E8E),
-                minimumSize: const Size(double.infinity, 55),
+                backgroundColor: const Color(0xFF2D2D5E),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 60),
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              child: Text(
-                pagoVigente
-                    ? "Nueva verificación"
-                    : "Registrar infracción",
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(pagoVigente ? Icons.search : Icons.report_problem_outlined, size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    pagoVigente ? "Nueva verificación" : "Notificar infracción",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            )
+            ),
+            
+            if (!pagoVigente) ...[
+               const SizedBox(height: 15),
+               TextButton(
+                 onPressed: () => Navigator.pop(context),
+                 style: TextButton.styleFrom(
+                   minimumSize: const Size(double.infinity, 50),
+                 ),
+                 child: Text(
+                   "Volver",
+                   style: GoogleFonts.poppins(
+                     color: Colors.grey,
+                     fontWeight: FontWeight.w600,
+                   ),
+                 ),
+               ),
+            ],
+            const SizedBox(height: 30),
           ],
         ),
       ),
@@ -179,31 +223,50 @@ class ResultadoVerificacionScreen extends StatelessWidget {
   }
 
   Widget _detailTile(IconData icon, String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: const Color(0xFF4A2E8E)),
-            const SizedBox(width: 15),
-            Column(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.grey.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F4FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: const Color(0xFF4DB6E1), size: 22),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: Colors.grey)),
-                Text(value,
-                    style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF2D2D5E),
+                  ),
+                ),
               ],
-            )
-          ],
-        ),
+            ),
+          )
+        ],
       ),
     );
   }

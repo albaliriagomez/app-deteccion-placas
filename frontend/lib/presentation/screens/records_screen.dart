@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/api_repository.dart';
 import 'record_detail_screen.dart';
+import 'scanner_screen.dart'; 
 
 class RecordsScreen extends StatefulWidget {
   final Function(PlateRecord)? onNewRecordAdded;
+  final VoidCallback? onNavigateToScanner;
 
   const RecordsScreen({
     super.key,
     this.onNewRecordAdded,
+    this.onNavigateToScanner,
   });
 
   @override
@@ -16,68 +19,64 @@ class RecordsScreen extends StatefulWidget {
 }
 
 class RecordsScreenState extends State<RecordsScreen> {
-  // --- CONSTANTES DE COLOR ---
-  static const Color _darkPurple = Color(0xFF311B92);
-  static const Color _successGreen = Color(0xFF8BC34A);
-  static const Color _errorRed = Color(0xFFE57373);
-  static const Color _lightGray = Color(0xFFF5F5F5);
-  static const Color _mediumGray = Color(0xFFE0E0E0);
-  static const Color _darkGray = Color(0xFF757575);
-  static const Color _white = Color(0xFFFFFFFF);
+  // --- CONSTANTES DE DISEÑO ---
+  static const Color _primaryDark = Color(0xFF2D2D5E);
+  static const Color _accentBlue = Color(0xFF4DB6E1);
+  static const Color _bgGray = Color(0xFFF8FAFF);
 
   // --- VARIABLES DE ESTADO ---
   final ApiRepository _apiRepository = ApiRepository();
   final TextEditingController _searchController = TextEditingController();
   
-  List<PlateRecord> _allRecords = []; // Base de datos local (memoria)
-  List<PlateRecord> _filteredRecords = []; // Lo que se muestra
+  List<PlateRecord> _allRecords = []; 
+  List<PlateRecord> _filteredRecords = []; 
   bool _isLoading = true;
-  String _selectedTimeFilter = 'Todos'; // Cambiado a 'Todos' por defecto
+  String _selectedTimeFilter = 'Todos';
 
   @override
   void initState() {
     super.initState();
-    _loadRecords(); // Se llama SOLO una vez
-    _searchController.addListener(_onSearchChanged);
+    _loadRecords(); 
+    _searchController.addListener(_applyFilters);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
+  // Carga con manejo de Timeout
+  Future<void> _loadRecords() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    
+    try {
+      // Intentamos obtener los registros
+      final records = await _apiRepository.getPlateRecords();
+      
+      if (mounted) {
+        setState(() {
+          _allRecords = records;
+          _filteredRecords = records;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBarError("No se pudo conectar con el servidor. Verifica tu conexión.");
+      }
+    }
+  }
+
   void addNewRecord(PlateRecord newRecord) {
     setState(() {
-      // Insertamos al principio de la lista local
       _allRecords.insert(0, newRecord);
-      // Re-aplicamos filtros para que aparezca en pantalla inmediatamente
       _applyFilters();
     });
   }
 
-  // Carga inicial desde el servidor
-  Future<void> _loadRecords() async {
-    setState(() => _isLoading = true);
-    try {
-      final records = await _apiRepository.getPlateRecords();
-      setState(() {
-        _allRecords = records;
-        _filteredRecords = records;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showSnackBarError("Error al conectar con el servidor");
-    }
-  }
-
-  void _onSearchChanged() {
-    _applyFilters();
-  }
-
-  // Función única de filtrado (Velocidad instantánea)
   void _applyFilters() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -106,46 +105,52 @@ class RecordsScreenState extends State<RecordsScreen> {
 
   void _showSnackBarError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: _errorRed),
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.poppins()),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : _lightGray,
-      appBar: _buildAppBar(isDark),
+      backgroundColor: _bgGray,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        
+      ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: _darkPurple))
+        ? const Center(child: CircularProgressIndicator(color: _primaryDark))
         : RefreshIndicator(
             onRefresh: _loadRecords,
-            color: _darkPurple,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTimeFilters(isDark),
-                        const SizedBox(height: 16),
-                        _buildSearchBar(isDark),
-                      ],
-                    ),
+            color: _primaryDark,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      _buildSearchBar(),
+                      const SizedBox(height: 15),
+                      _buildTimeFilters(),
+                    ],
                   ),
                 ),
-                _filteredRecords.isEmpty
-                    ? SliverFillRemaining(child: _buildEmptyState())
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildRecordCard(_filteredRecords[index], isDark),
-                          childCount: _filteredRecords.length,
+                const SizedBox(height: 10),
+                Expanded(
+                  child: _filteredRecords.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 100),
+                          itemCount: _filteredRecords.length,
+                          itemBuilder: (context, index) => _buildRecordCard(_filteredRecords[index]),
                         ),
-                      ),
-                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ),
               ],
             ),
           ),
@@ -154,22 +159,12 @@ class RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  // --- COMPONENTES ---
-
-  AppBar _buildAppBar(bool isDark) {
-    return AppBar(
-      backgroundColor: isDark ? const Color(0xFF2A2A2A) : _white,
-      elevation: 2,
-      automaticallyImplyLeading: false,
-      title: Text('HISTORIAL', style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: _darkPurple)),
-    );
-  }
-
-  Widget _buildTimeFilters(bool isDark) {
+  Widget _buildTimeFilters() {
     final filters = ['Todos', 'Hoy', 'Esta semana', 'Mes'];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
         children: filters.map((filter) => Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: ChoiceChip(
@@ -181,80 +176,121 @@ class RecordsScreenState extends State<RecordsScreen> {
                 _applyFilters();
               }
             },
-            selectedColor: _darkPurple,
+            selectedColor: _primaryDark,
+            backgroundColor: Colors.white,
             labelStyle: GoogleFonts.poppins(
-              color: _selectedTimeFilter == filter ? Colors.white : Colors.black,
+              color: _selectedTimeFilter == filter ? Colors.white : _primaryDark,
               fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            side: BorderSide(color: _selectedTimeFilter == filter ? _primaryDark : Colors.transparent),
           ),
         )).toList(),
       ),
     );
   }
 
-  Widget _buildSearchBar(bool isDark) {
-    return TextField(
-      controller: _searchController,
-      decoration: InputDecoration(
-        hintText: 'Buscar patente...',
-        prefixIcon: const Icon(Icons.search),
-        filled: true,
-        fillColor: isDark ? const Color(0xFF3A3A3A) : _white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))
+        ]
+      ),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar por patente...',
+          hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: _accentBlue),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+        ),
       ),
     );
   }
 
-  Widget _buildRecordCard(PlateRecord record, bool isDark) {
+  Widget _buildRecordCard(PlateRecord record) {
     final isValid = record.estado == 'VÁLIDO';
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+        ]
+      ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
         ),
-        leading: CircleAvatar(
-          backgroundColor: isValid ? _successGreen : _errorRed,
-          child: Icon(isValid ? Icons.check : Icons.warning, color: Colors.white),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isValid ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isValid ? Icons.check_circle : Icons.warning_amber_rounded, 
+            color: isValid ? Colors.green : Colors.red,
+            size: 26,
+          ),
         ),
-        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${record.ubicacion}\n${_formatDateTime(record.fecha)}'),
-        trailing: const Icon(Icons.chevron_right),
-        isThreeLine: true,
+        title: Text(
+          record.placa, 
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16, color: _primaryDark)
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(record.ubicacion, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+            Text(_formatDateTime(record.fecha), style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _accentBlue)),
+          ],
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
       ),
     );
   }
 
   Widget _buildFAB() {
-    // Si esta pantalla es una pestaña, el botón debería cerrar o cambiar de tab
-    return FloatingActionButton.extended(
-      onPressed: () {
-        // Esto asume que quieres volver al escáner si está en un Navigator
-        // Si quieres que cambie de pestaña, podrías pasarle un callback
-        if (Navigator.canPop(context)) Navigator.pop(context);
-      },
-      backgroundColor: _darkPurple,
-      icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-      label: const Text("ESCANEAR", style: TextStyle(color: Colors.white)),
-    );
-  }
+  return FloatingActionButton(
+    onPressed: () {
+      if (widget.onNavigateToScanner != null) {
+        widget.onNavigateToScanner!();
+      }
+    },
+    backgroundColor: const Color(0xFF1B2430), // Tu color _primaryDark
+    elevation: 5,
+    shape: const CircleBorder(), 
+    child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
+  );
+}
 
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.search_off, size: 60, color: Colors.grey),
-          const SizedBox(height: 10),
-          Text('No se encontraron registros', style: GoogleFonts.poppins(color: Colors.grey)),
+          Icon(Icons.history_toggle_off_rounded, size: 80, color: Colors.grey.withOpacity(0.3)),
+          const SizedBox(height: 15),
+          Text(
+            'Sin registros encontrados', 
+            style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.w500)
+          ),
         ],
       ),
     );
   }
 
   String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '${dateTime.day.toString().padLeft(2,'0')}/${dateTime.month.toString().padLeft(2,'0')} • ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')} HS';
   }
 }

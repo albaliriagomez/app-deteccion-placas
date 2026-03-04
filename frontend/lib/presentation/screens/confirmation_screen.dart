@@ -435,8 +435,16 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const VerificandoScreen(),
+      builder: (_) => VerificandoScreen(
+        data: {
+          "placa": _plateController.text.trim().toUpperCase(),
+          "base64Image": widget.base64Image,
+          "ubicacion": widget.location,
+          "latitude": widget.latitude,
+          "longitude": widget.longitude,
+        },
       ),
+    ),
     );
 
     try {

@@ -34,7 +34,7 @@ class ScannerScreen extends StatefulWidget {
 
 
 
-class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProviderStateMixin {
+class _ScannerScreenState extends State<ScannerScreen>  {
 
   CameraController? _controller;
 
@@ -46,12 +46,8 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
 
   bool _isFlashOn = false;
 
-  late TabController _tabController;
-
-  // Key para acceder al estado de RecordsScreen y agregar registros en caliente
 
   final GlobalKey<RecordsScreenState> _recordsKey = GlobalKey<RecordsScreenState>();
-
 
 
   // Color palette
@@ -75,15 +71,6 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   void initState() {
 
     super.initState();
-
-    _tabController = TabController(length: 2, vsync: this);
-
-    _tabController.addListener(() {
-
-      if (_tabController.index == 1) setState(() {});
-
-    });
-
     _initializeCamera();
 
   }
@@ -92,17 +79,32 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
 
   Future<void> _initializeCamera() async {
 
-    final cameras = await availableCameras();
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return;
+      
+      final backCamera = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.back);
+      
+      // Asegurémonos de cerrar cualquier controlador previo antes de crear uno nuevo
+      if (_controller != null) {
+        await _controller!.dispose();
+      }
 
-    if (cameras.isEmpty) return;
+      _controller = CameraController(
+        backCamera, 
+        ResolutionPreset.high, 
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.yuv420, // Agregado para compatibilidad Android
+      );
 
-    final backCamera = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.back);
-
-    _controller = CameraController(backCamera, ResolutionPreset.high, enableAudio: false);
-
-    await _controller!.initialize();
-
-    if (mounted) setState(() => _isCameraReady = true);
+      await _controller!.initialize();
+      
+      if (mounted) {
+        setState(() => _isCameraReady = true);
+      }
+    } catch (e) {
+      print("Error inicializando cámara: $e");
+    }
 
   }
 
@@ -337,7 +339,7 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
         );
 
         _recordsKey.currentState?.addNewRecord(newRecord);
-        _tabController.animateTo(1);
+        
       }
     } catch (e) {
       print('Error en captura: $e');
@@ -397,38 +399,20 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (!_isCameraReady) {
+    if (!_isCameraReady || _controller == null || !_controller!.value.isInitialized) {
       return Scaffold(
         backgroundColor: isDark ? _darkBg : _lightBg,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(_neonCyan),
-              ),
-              const SizedBox(height: 20),
-              Text('Inicializando cámara...',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : Colors.grey[700],
-                  )),
-            ],
-          ),
+        body: const Center(
+          child: CircularProgressIndicator(color: _neonCyan),
         ),
       );
     }
 
+    
+
     return Scaffold(
       backgroundColor: isDark ? _darkBg : _lightBg,
-      body: TabBarView(
-        controller: _tabController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _buildScannerTab(),
-          RecordsScreen(key: _recordsKey),
-        ],
-      ),
+      body: _buildScannerTab(), 
     );
   }
 
@@ -630,7 +614,6 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   @override
   void dispose() {
     _controller?.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 }
