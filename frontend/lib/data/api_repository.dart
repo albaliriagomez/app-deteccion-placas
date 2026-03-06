@@ -54,7 +54,7 @@ class ApiRepository {
     String imageBase64, {
     String? location,
     String? latitude,  
-    String? longitude,
+    String? longitude, 
     String? hora,      
   }) async {
     try {
