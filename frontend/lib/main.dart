@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/app_shell.dart';
-import 'presentation/screens/resultado_verificacion.dart'; // ✅ NUEVA IMPORTACIÓN
+import 'presentation/screens/resultado_verificacion.dart';
 import 'presentation/screens/infraccion_registrada_screen.dart';
 
 void main() {
@@ -20,19 +20,30 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         textTheme: GoogleFonts.poppinsTextTheme(),
-        primarySwatch: Colors.indigo,
+        primaryColor: const Color(0xFF2D2D5E),
       ),
       initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/app': (context) => const AppShell(),
+      // Usamos onGenerateRoute para poder pasar el initialIndex dinámicamente
+      onGenerateRoute: (settings) {
+        if (settings.name == '/app') {
+          // Extraemos el índice si se envía por argumentos, sino por defecto es 0
+          final int index = settings.arguments as int? ?? 0;
+          return MaterialPageRoute(
+            builder: (context) => AppShell(initialIndex: index),
+          );
+        }
 
-        // ✅ NUEVA RUTA AGREGADA
-        '/resultadoVerificacion': (context) =>
-            const ResultadoVerificacionScreen(),
-
-        '/infraccionRegistrada': (context) =>
-            const InfraccionRegistradaScreen(),
+        // Rutas normales
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          case '/resultadoVerificacion':
+            return MaterialPageRoute(builder: (_) => const ResultadoVerificacionScreen());
+          case '/infraccionRegistrada':
+            return MaterialPageRoute(builder: (_) => const InfraccionRegistradaScreen());
+          default:
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+        }
       },
     );
   }

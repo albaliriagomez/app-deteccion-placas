@@ -3,7 +3,7 @@ from psycopg2 import sql
 
 # Datos de conexión (Asegúrate de que coincidan con tu pgAdmin)
 DB_USER = "postgres"
-DB_PASS = "123"
+DB_PASS = "1234"
 DB_HOST = "localhost"
 DB_PORT = "5432"
 DB_NAME = "multasplacas"

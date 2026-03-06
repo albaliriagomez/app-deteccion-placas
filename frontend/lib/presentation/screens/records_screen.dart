@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/api_repository.dart';
 import 'record_detail_screen.dart';
-import 'scanner_screen.dart'; 
+
+// Definición de la clase PlateRecord por si no estuviera importada
+// (Asegúrate de que coincida con tu modelo de datos)
 
 class RecordsScreen extends StatefulWidget {
-  final Function(PlateRecord)? onNewRecordAdded;
+  final Function(dynamic)? onNewRecordAdded;
   final VoidCallback? onNavigateToScanner;
 
   const RecordsScreen({
@@ -19,18 +22,17 @@ class RecordsScreen extends StatefulWidget {
 }
 
 class RecordsScreenState extends State<RecordsScreen> {
-  // --- CONSTANTES DE DISEÑO ---
   static const Color _primaryDark = Color(0xFF2D2D5E);
   static const Color _accentBlue = Color(0xFF4DB6E1);
   static const Color _bgGray = Color(0xFFF8FAFF);
 
-  // --- VARIABLES DE ESTADO ---
   final ApiRepository _apiRepository = ApiRepository();
   final TextEditingController _searchController = TextEditingController();
   
-  List<PlateRecord> _allRecords = []; 
-  List<PlateRecord> _filteredRecords = []; 
+  List<dynamic> _allRecords = []; 
+  List<dynamic> _filteredRecords = []; 
   bool _isLoading = true;
+  String? _errorMessage;
   String _selectedTimeFilter = 'Todos';
 
   @override
@@ -46,15 +48,23 @@ class RecordsScreenState extends State<RecordsScreen> {
     super.dispose();
   }
 
-  // Carga con manejo de Timeout
+  // MÉTODO IMPORTANTE: Debe ser público (sin guion bajo) para que ScannerScreen lo vea
+  void addNewRecord(dynamic newRecord) {
+    setState(() {
+      _allRecords.insert(0, newRecord);
+      _applyFilters();
+    });
+  }
+
   Future<void> _loadRecords() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     
     try {
-      // Intentamos obtener los registros
       final records = await _apiRepository.getPlateRecords();
-      
       if (mounted) {
         setState(() {
           _allRecords = records;
@@ -62,19 +72,21 @@ class RecordsScreenState extends State<RecordsScreen> {
           _isLoading = false;
         });
       }
+    } on TimeoutException {
+      _handleError("El servidor tardó demasiado en responder.");
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showSnackBarError("No se pudo conectar con el servidor. Verifica tu conexión.");
-      }
+      _handleError("Error de conexión. Verifica tu internet.");
     }
   }
 
-  void addNewRecord(PlateRecord newRecord) {
-    setState(() {
-      _allRecords.insert(0, newRecord);
-      _applyFilters();
-    });
+  void _handleError(String msg) {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = msg;
+      });
+      _showSnackBarError(msg);
+    }
   }
 
   void _applyFilters() {
@@ -97,7 +109,6 @@ class RecordsScreenState extends State<RecordsScreen> {
           final monthAgo = now.subtract(const Duration(days: 30));
           matchesTime = recordDate.isAfter(monthAgo);
         }
-
         return matchesSearch && matchesTime;
       }).toList();
     });
@@ -109,7 +120,6 @@ class RecordsScreenState extends State<RecordsScreen> {
         content: Text(msg, style: GoogleFonts.poppins()),
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -118,12 +128,6 @@ class RecordsScreenState extends State<RecordsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bgGray,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        
-      ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: _primaryDark))
         : RefreshIndicator(
@@ -131,6 +135,7 @@ class RecordsScreenState extends State<RecordsScreen> {
             color: _primaryDark,
             child: Column(
               children: [
+                const SizedBox(height: 50), // Espacio para el status bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
@@ -143,19 +148,68 @@ class RecordsScreenState extends State<RecordsScreen> {
                 ),
                 const SizedBox(height: 10),
                 Expanded(
-                  child: _filteredRecords.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 100),
-                          itemCount: _filteredRecords.length,
-                          itemBuilder: (context, index) => _buildRecordCard(_filteredRecords[index]),
-                        ),
+                  child: _errorMessage != null 
+                      ? _buildErrorState()
+                      : _filteredRecords.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(bottom: 100, top: 10),
+                              itemCount: _filteredRecords.length,
+                              itemBuilder: (context, index) => _buildRecordCard(_filteredRecords[index]),
+                            ),
                 ),
               ],
             ),
           ),
       floatingActionButton: _buildFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildErrorState() {
+    return ListView( // Usamos ListView para que el RefreshIndicator funcione
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        Center(
+          child: Column(
+            children: [
+              // SOLUCIÓN AL ERROR DE COLOR:
+              Icon(Icons.cloud_off_rounded, size: 80, color: Colors.red.withOpacity(0.3)),
+              const SizedBox(height: 15),
+              Text(
+                _errorMessage ?? "Error de conexión",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _loadRecords,
+                style: ElevatedButton.styleFrom(backgroundColor: _primaryDark),
+                child: const Text("Reintentar", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]
+      ),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar por patente...',
+          prefixIcon: const Icon(Icons.search, color: _accentBlue),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+      ),
     );
   }
 
@@ -177,120 +231,43 @@ class RecordsScreenState extends State<RecordsScreen> {
               }
             },
             selectedColor: _primaryDark,
-            backgroundColor: Colors.white,
-            labelStyle: GoogleFonts.poppins(
-              color: _selectedTimeFilter == filter ? Colors.white : _primaryDark,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            side: BorderSide(color: _selectedTimeFilter == filter ? _primaryDark : Colors.transparent),
+            labelStyle: TextStyle(color: _selectedTimeFilter == filter ? Colors.white : _primaryDark),
           ),
         )).toList(),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))
-        ]
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Buscar por patente...',
-          hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
-          prefixIcon: const Icon(Icons.search, color: _accentBlue),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecordCard(PlateRecord record) {
-    final isValid = record.estado == 'VÁLIDO';
-    return Container(
+  Widget _buildRecordCard(dynamic record) {
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
-        ]
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
         ),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isValid ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            isValid ? Icons.check_circle : Icons.warning_amber_rounded, 
-            color: isValid ? Colors.green : Colors.red,
-            size: 26,
-          ),
-        ),
-        title: Text(
-          record.placa, 
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16, color: _primaryDark)
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(record.ubicacion, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
-            Text(_formatDateTime(record.fecha), style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _accentBlue)),
-          ],
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        leading: const CircleAvatar(backgroundColor: _bgGray, child: Icon(Icons.directions_car, color: _primaryDark)),
+        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
       ),
     );
   }
 
   Widget _buildFAB() {
-  return FloatingActionButton(
-    onPressed: () {
-      if (widget.onNavigateToScanner != null) {
-        widget.onNavigateToScanner!();
-      }
-    },
-    backgroundColor: const Color(0xFF1B2430), // Tu color _primaryDark
-    elevation: 5,
-    shape: const CircleBorder(), 
-    child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
-  );
-}
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history_toggle_off_rounded, size: 80, color: Colors.grey.withOpacity(0.3)),
-          const SizedBox(height: 15),
-          Text(
-            'Sin registros encontrados', 
-            style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.w500)
-          ),
-        ],
-      ),
+    return FloatingActionButton(
+      onPressed: widget.onNavigateToScanner,
+      backgroundColor: _primaryDark,
+      child: const Icon(Icons.qr_code_scanner, color: Colors.white),
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(child: Text('Sin registros', style: GoogleFonts.poppins(color: Colors.grey)));
+  }
+
   String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day.toString().padLeft(2,'0')}/${dateTime.month.toString().padLeft(2,'0')} • ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')} HS';
+    return '${dateTime.day}/${dateTime.month} • ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')} HS';
   }
 }
