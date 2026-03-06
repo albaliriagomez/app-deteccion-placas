@@ -47,7 +47,7 @@ class PlateRecord {
 
 class ApiRepository {
   // RECUERDA: Asegúrate de que esta IP coincida con la de tu servidor actual
-  static const String _baseUrl = 'http://192.168.31.119:8000'; 
+  static const String _baseUrl = 'http://192.168.31.11:8000'; 
 
   Future<Map<String, dynamic>> savePlateRecord(
     String plate, 

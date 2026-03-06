@@ -14,93 +14,73 @@ class InfraccionRegistradaScreen extends StatefulWidget {
 }
 
 class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen> {
-
   Map<String, dynamic> registro = {};
   bool notificacionEnviada = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
+  // Función para enviar notificación
+  Future<void> _enviarNotificacion(Map<String, dynamic> datos) async {
     if (notificacionEnviada) return;
-
-    final args = ModalRoute.of(context)?.settings.arguments;
-
-    if (args != null && args is Map<String, dynamic>) {
-      registro = args["registro"] ?? {};
-    }
-
-    _enviarNotificacion();
     notificacionEnviada = true;
-  }
-
-  Future<void> _enviarNotificacion() async {
 
     try {
-
       final token = SessionManager.semToken;
-
-      if (token == null) {
-        debugPrint("Token no disponible");
-        return;
-      }
+      if (token == null) return;
 
       await NotificacionService.enviarNotificacion(
         token: token,
-        placa: registro["placa"] ?? "",
-        latitude: registro["latitude"] ?? "",
-        longitude: registro["longitude"] ?? "",
+        placa: datos["placa"] ?? "",
+        latitude: datos["latitude"] ?? "",
+        longitude: datos["longitude"] ?? "",
       );
-
-      debugPrint("Notificación enviada correctamente");
-
+      debugPrint("Notificación enviada con éxito");
     } catch (e) {
-
       debugPrint("Error enviando notificación: $e");
-
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // CORRECCIÓN CLAVE: Usamos 'as Map?' para evitar el error de subtipo de la imagen
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    
+    if (args != null && registro.isEmpty) {
+      // Convertimos el mapa dinámico a Map<String, dynamic> de forma segura
+      final mapaSeguro = Map<String, dynamic>.from(args);
+      
+      setState(() {
+        registro = Map<String, dynamic>.from(mapaSeguro["registro"] ?? {});
+      });
+      
+      // Ejecutar la notificación un frame después para no bloquear la UI
+      Future.delayed(Duration.zero, () => _enviarNotificacion(registro));
+    }
 
     final placa = registro["placa"] ?? "N/A";
     final fecha = registro["fecha"] ?? "";
     final ubicacion = registro["ubicacion"] ?? "N/A";
 
     String fechaMostrar = "N/A";
-
     if (fecha.toString().length >= 10) {
       fechaMostrar = fecha.toString().substring(0, 10);
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-
           child: Column(
             children: [
-
               const SizedBox(height: 20),
-
               Align(
                 alignment: Alignment.topRight,
                 child: Container(
                   padding: const EdgeInsets.all(8),
-
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-
-                  child: const Icon(
-                    Icons.dark_mode,
-                    color: Color(0xFF2D2D5E),
-                    size: 20,
-                  ),
+                  child: const Icon(Icons.dark_mode, color: Color(0xFF2D2D5E), size: 20),
                 ),
               ),
 
@@ -109,22 +89,15 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
               Stack(
                 alignment: Alignment.center,
                 children: [
-
                   Container(
                     width: 120,
                     height: 120,
-
                     decoration: const BoxDecoration(
                       color: Color(0xFFE8F5E9),
                       shape: BoxShape.circle,
                     ),
                   ),
-
-                  const Icon(
-                    Icons.check_circle,
-                    size: 80,
-                    color: Color(0xFF4CAF50),
-                  ),
+                  const Icon(Icons.check_circle, size: 80, color: Color(0xFF4CAF50)),
                 ],
               ),
 
@@ -133,7 +106,6 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
               Text(
                 "Infracción registrada\ncorrectamente",
                 textAlign: TextAlign.center,
-
                 style: GoogleFonts.poppins(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -146,7 +118,6 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
               Text(
                 "La infracción fue enviada automáticamente\nal sistema central.",
                 textAlign: TextAlign.center,
-
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: Colors.grey.shade600,
@@ -157,7 +128,6 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
 
               Container(
                 padding: const EdgeInsets.all(25),
-
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(25),
@@ -169,12 +139,9 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
                     )
                   ],
                 ),
-
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-
                   children: [
-
                     Text(
                       "DETALLES DEL REGISTRO",
                       style: GoogleFonts.poppins(
@@ -184,39 +151,15 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
                         letterSpacing: 0.8,
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
-                    _detailRow(
-                      Icons.directions_car_outlined,
-                      "Patente",
-                      placa,
-                      isBold: true,
-                    ),
-
+                    _detailRow(Icons.directions_car_outlined, "Patente", placa, isBold: true),
                     const Divider(height: 30),
-
-                    _detailRow(
-                      Icons.access_time,
-                      "Hora",
-                      "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} HS",
-                    ),
-
+                    _detailRow(Icons.access_time, "Hora", 
+                      "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')} HS"),
                     const Divider(height: 30),
-
-                    _detailRow(
-                      Icons.calendar_today_outlined,
-                      "Fecha",
-                      fechaMostrar,
-                    ),
-
+                    _detailRow(Icons.calendar_today_outlined, "Fecha", fechaMostrar),
                     const Divider(height: 30),
-
-                    _detailRow(
-                      Icons.location_on_outlined,
-                      "Ubicación",
-                      ubicacion,
-                    ),
+                    _detailRow(Icons.location_on_outlined, "Ubicación", ubicacion),
                   ],
                 ),
               ),
@@ -225,38 +168,26 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
 
               ElevatedButton(
                 onPressed: () {
-
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AppShell(initialIndex: 1),
-                    ),
+                  Navigator.pushNamedAndRemoveUntil(
+                    context, 
+                    '/app', 
                     (route) => false,
+                    arguments: 0, 
                   );
-
                 },
-
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D2D5E),
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 60),
-
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-
                   children: [
-
-                    const Icon(Icons.qr_code_scanner),
-
+                    const Icon(Icons.home_rounded),
                     const SizedBox(width: 10),
-
                     Text(
-                      "Nueva verificación",
+                      "Volver al Menú",
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -274,26 +205,13 @@ class _InfraccionRegistradaScreenState extends State<InfraccionRegistradaScreen>
     );
   }
 
-  Widget _detailRow(IconData icon, String title, String value,
-      {bool isBold = false}) {
-
+  Widget _detailRow(IconData icon, String title, String value, {bool isBold = false}) {
     return Row(
       children: [
-
         Icon(icon, color: Colors.blueGrey.shade300, size: 20),
-
         const SizedBox(width: 12),
-
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.blueGrey.shade400,
-          ),
-        ),
-
+        Text(title, style: GoogleFonts.poppins(fontSize: 14, color: Colors.blueGrey.shade400)),
         const Spacer(),
-
         Flexible(
           child: Text(
             value,

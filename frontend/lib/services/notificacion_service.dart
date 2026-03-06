@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 class NotificacionService {
 
+
   static const String url =
       "https://semapidev.cochabamba.bo/api/v1/appsem/notificacion";
 
