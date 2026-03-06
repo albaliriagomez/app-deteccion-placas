@@ -47,14 +47,14 @@ class PlateRecord {
 
 class ApiRepository {
   // RECUERDA: Asegúrate de que esta IP coincida con la de tu servidor actual
-  static const String _baseUrl = 'http://192.168.0.15:8000'; 
+  static const String _baseUrl = 'http://192.168.31.119:8000'; 
 
   Future<Map<String, dynamic>> savePlateRecord(
     String plate, 
     String imageBase64, {
     String? location,
     String? latitude,  
-    String? longitude,
+    String? longitude, 
     String? hora,      
   }) async {
     try {
