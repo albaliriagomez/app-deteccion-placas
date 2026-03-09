@@ -166,27 +166,28 @@ class RecordsScreenState extends State<RecordsScreen> {
   }
 
   Widget _buildRecordCard(PlateRecord record) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        onTap: () => Navigator.push(
+  return Card(
+    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+    child: ListTile(
+      onTap: () {
+        // Al tocar, vamos al detalle. El detalle se encargará de pedir la foto.
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
-        ),
-        leading: const CircleAvatar(
-          backgroundColor: _bgGray, 
-          child: Icon(Icons.directions_car, color: _primaryDark)
-        ),
-        // CAMBIO: record.placa y record.fecha (acceso a objeto)
-        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+        );
+      },
+      leading: const CircleAvatar(
+        backgroundColor: Color(0xFFF8FAFF), 
+        child: Icon(Icons.directions_car, color: Color(0xFF2D2D5E))
       ),
-    );
-  }
+      title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+    ),
+  );
+}
 
-  // ... (Mantén los métodos _buildSearchBar, _buildTimeFilters, _buildErrorState y _buildEmptyState igual que antes)
 
   Widget _buildSearchBar() {
     return Container(

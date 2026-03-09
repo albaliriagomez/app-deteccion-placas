@@ -103,6 +103,23 @@ class ApiRepository {
       };
     }
   }
+Future<String?> getFullImage(int id) async {
+  try {
+    final response = await http.get(
+      Uri.parse("$_baseUrl/api/registros/$id/imagen"),
+      headers: {"Accept": "application/json"},
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['imagen']; // Retorna el String Base64
+    }
+    return null;
+  } catch (e) {
+    print("❌ Error cargando imagen individual: $e");
+    return null;
+  }
+}
 
  Future<List<PlateRecord>> getPlateRecords() async {
   try {
