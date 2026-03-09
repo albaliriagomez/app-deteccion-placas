@@ -1,22 +1,40 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import login, multas 
-import uvicorn
-from app.routes import parqueo
+from dotenv import load_dotenv
+import os
 
-app = FastAPI(title="API Fotomultas SEM")
+from app.routes.multas import router as multas_router
+from app.routes.login import router as login_router
+from app.routes.parqueo import router as parqueo_router 
+from db_create import init_system 
 
+# Cargar variables de entorno
+load_dotenv()
+
+# Inicializar la base de datos (crear tablas si no existen)
+init_system()
+
+# Crear la instancia de FastAPI que busca Uvicorn
+app = FastAPI(title="Sistema de Multas SEM")
+
+# Configurar CORS para que tu App de Flutter pueda conectarse
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Se incluyen tal cual
-app.include_router(login.router)
-app.include_router(multas.router)
-app.include_router(parqueo.router)
+# Incluir los endpoints del servidor
+app.include_router(login_router)
+app.include_router(multas_router)
+app.include_router(parqueo_router)
+
+@app.get("/")
+def home():
+    return {"status": "Servidor SEM activo", "database": "Conectada"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

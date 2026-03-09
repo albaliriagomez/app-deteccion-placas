@@ -1,16 +1,20 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
+from dotenv import load_dotenv
 
-# En Docker, usaremos variables de entorno. Si no, usa local.
-DB_CONFIG = {
-    "dbname": "multasplacas",
-    "user": "postgres",
-    "password": "1234",
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": "5432"
-}
+# Carga las variables del archivo .env
+load_dotenv()
+
+def get_db_connection():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT"),
+        cursor_factory=RealDictCursor
+    )
 
 def get_db_connection():
     return psycopg2.connect(

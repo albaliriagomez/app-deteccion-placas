@@ -1,21 +1,44 @@
 import psycopg2
 from psycopg2 import sql
+import os
+import time
+from dotenv import load_dotenv
 
-# Datos de conexión (Asegúrate de que coincidan con tu pgAdmin)
-DB_USER = "postgres"
-DB_PASS = "1234"
-DB_HOST = "localhost"
-DB_PORT = "5432"
-DB_NAME = "multasplacas"
+# Carga las variables del archivo .env
+load_dotenv()
+
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
 
 def init_system():
     conn = None
+    # Reintentos por si la DB está arrancando (útil en Docker)
+    for i in range(5):
+        try:
+            conn = psycopg2.connect(
+                dbname="postgres", 
+                user=DB_USER, 
+                password=DB_PASS, 
+                host=DB_HOST, 
+                port=DB_PORT
+            )
+            break
+        except Exception:
+            print(f"🔄 Esperando a la base de datos... ({i+1}/5)")
+            time.sleep(2)
+    
+    if not conn:
+        print("❌ Error: No se pudo conectar a PostgreSQL.")
+        return
+
     try:
-        # 1. Conectar a postgres para crear la DB si no existe
-        conn = psycopg2.connect(dbname="postgres", user=DB_USER, password=DB_PASS, host=DB_HOST, port=DB_PORT)
         conn.autocommit = True
         cursor = conn.cursor()
         
+        # 1. Crear Base de Datos si no existe
         cursor.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = '{DB_NAME}'")
         if not cursor.fetchone():
             cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(DB_NAME)))
@@ -24,21 +47,10 @@ def init_system():
         cursor.close()
         conn.close()
 
-        # 2. Conectar a la nueva DB para crear las tablas
+        # 2. Crear Tabla de Placas únicamente
         conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST, port=DB_PORT)
         cursor = conn.cursor()
 
-        # Tabla de Usuarios
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                usuario VARCHAR(50) UNIQUE NOT NULL,
-                password VARCHAR(50) NOT NULL,
-                rol VARCHAR(20) NOT NULL
-            );
-        """)
-
-        # Tabla de Placas (Con tu estructura real: imagen_path)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS placas (
                 id SERIAL PRIMARY KEY,
@@ -53,10 +65,10 @@ def init_system():
         """)
         
         conn.commit()
-        print("✅ Tablas 'usuarios' y 'placas' verificadas/creadas.")
+        print("✅ Estructura de base de datos lista (Tabla 'placas').")
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error en inicialización: {e}")
     finally:
         if conn: conn.close()
 

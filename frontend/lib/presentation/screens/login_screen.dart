@@ -128,9 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 _buildInput(
                   controller: _userController,
-                  hint: "ej. supervisor_01",
-                  label: "Usuario",
-                  icon: Icons.person_outline,
+                  hint: "correo@ejemplo.com",
+                  label: "Email SEM",       
+                  icon: Icons.email_outlined,
                 ),
                 const SizedBox(height: 20),
 

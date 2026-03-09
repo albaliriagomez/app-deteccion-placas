@@ -4,9 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/api_repository.dart';
 import 'record_detail_screen.dart';
 
-// Definición de la clase PlateRecord por si no estuviera importada
-// (Asegúrate de que coincida con tu modelo de datos)
-
 class RecordsScreen extends StatefulWidget {
   final Function(dynamic)? onNewRecordAdded;
   final VoidCallback? onNavigateToScanner;
@@ -29,8 +26,10 @@ class RecordsScreenState extends State<RecordsScreen> {
   final ApiRepository _apiRepository = ApiRepository();
   final TextEditingController _searchController = TextEditingController();
   
-  List<dynamic> _allRecords = []; 
-  List<dynamic> _filteredRecords = []; 
+  // CAMBIO: Ahora usamos el tipo PlateRecord definido en tu repositorio
+  List<PlateRecord> _allRecords = []; 
+  List<PlateRecord> _filteredRecords = []; 
+  
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedTimeFilter = 'Todos';
@@ -48,8 +47,7 @@ class RecordsScreenState extends State<RecordsScreen> {
     super.dispose();
   }
 
-  // MÉTODO IMPORTANTE: Debe ser público (sin guion bajo) para que ScannerScreen lo vea
-  void addNewRecord(dynamic newRecord) {
+  void addNewRecord(PlateRecord newRecord) {
     setState(() {
       _allRecords.insert(0, newRecord);
       _applyFilters();
@@ -64,7 +62,9 @@ class RecordsScreenState extends State<RecordsScreen> {
     });
     
     try {
-      final records = await _apiRepository.getPlateRecords();
+      // Llamamos al repo que ya devuelve List<PlateRecord>
+      final List<PlateRecord> records = await _apiRepository.getPlateRecords();
+
       if (mounted) {
         setState(() {
           _allRecords = records;
@@ -75,7 +75,8 @@ class RecordsScreenState extends State<RecordsScreen> {
     } on TimeoutException {
       _handleError("El servidor tardó demasiado en responder.");
     } catch (e) {
-      _handleError("Error de conexión. Verifica tu internet.");
+      print("Error detallado: $e");
+      _handleError("No se pudo conectar con el servidor.");
     }
   }
 
@@ -91,10 +92,12 @@ class RecordsScreenState extends State<RecordsScreen> {
 
   void _applyFilters() {
     final query = _searchController.text.toLowerCase();
+    final now = DateTime.now(); 
+
     setState(() {
       _filteredRecords = _allRecords.where((record) {
+        // CAMBIO: Acceso mediante punto (record.placa) porque es un objeto
         final matchesSearch = record.placa.toLowerCase().contains(query);
-        final now = DateTime.now();
         final recordDate = record.fecha;
         
         bool matchesTime = true;
@@ -114,15 +117,7 @@ class RecordsScreenState extends State<RecordsScreen> {
     });
   }
 
-  void _showSnackBarError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.poppins()),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  // --- UI WIDGETS ---
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +130,7 @@ class RecordsScreenState extends State<RecordsScreen> {
             color: _primaryDark,
             child: Column(
               children: [
-                const SizedBox(height: 50), // Espacio para el status bar
+                const SizedBox(height: 50),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
@@ -161,38 +156,37 @@ class RecordsScreenState extends State<RecordsScreen> {
               ],
             ),
           ),
-      floatingActionButton: _buildFAB(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: widget.onNavigateToScanner,
+        backgroundColor: _primaryDark,
+        child: const Icon(Icons.qr_code_scanner, color: Colors.white),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
-  Widget _buildErrorState() {
-    return ListView( // Usamos ListView para que el RefreshIndicator funcione
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-        Center(
-          child: Column(
-            children: [
-              // SOLUCIÓN AL ERROR DE COLOR:
-              Icon(Icons.cloud_off_rounded, size: 80, color: Colors.red.withOpacity(0.3)),
-              const SizedBox(height: 15),
-              Text(
-                _errorMessage ?? "Error de conexión",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _loadRecords,
-                style: ElevatedButton.styleFrom(backgroundColor: _primaryDark),
-                child: const Text("Reintentar", style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
+  Widget _buildRecordCard(PlateRecord record) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
         ),
-      ],
+        leading: const CircleAvatar(
+          backgroundColor: _bgGray, 
+          child: Icon(Icons.directions_car, color: _primaryDark)
+        ),
+        // CAMBIO: record.placa y record.fecha (acceso a objeto)
+        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+      ),
     );
   }
+
+  // ... (Mantén los métodos _buildSearchBar, _buildTimeFilters, _buildErrorState y _buildEmptyState igual que antes)
 
   Widget _buildSearchBar() {
     return Container(
@@ -203,11 +197,11 @@ class RecordsScreenState extends State<RecordsScreen> {
       ),
       child: TextField(
         controller: _searchController,
-        decoration: InputDecoration(
+        decoration: const InputDecoration(
           hintText: 'Buscar por patente...',
-          prefixIcon: const Icon(Icons.search, color: _accentBlue),
+          prefixIcon: Icon(Icons.search, color: _accentBlue),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          contentPadding: EdgeInsets.symmetric(vertical: 15),
         ),
       ),
     );
@@ -238,36 +232,44 @@ class RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  Widget _buildRecordCard(dynamic record) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
-        ),
-        leading: const CircleAvatar(backgroundColor: _bgGray, child: Icon(Icons.directions_car, color: _primaryDark)),
-        title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-      ),
-    );
-  }
-
-  Widget _buildFAB() {
-    return FloatingActionButton(
-      onPressed: widget.onNavigateToScanner,
-      backgroundColor: _primaryDark,
-      child: const Icon(Icons.qr_code_scanner, color: Colors.white),
-    );
-  }
-
   Widget _buildEmptyState() {
     return Center(child: Text('Sin registros', style: GoogleFonts.poppins(color: Colors.grey)));
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month} • ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')} HS';
+  Widget _buildErrorState() {
+    return ListView(
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        Center(
+          child: Column(
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 80, color: Colors.red.withOpacity(0.3)),
+              const SizedBox(height: 15),
+              Text(
+                _errorMessage ?? "Error de conexión",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _loadRecords,
+                style: ElevatedButton.styleFrom(backgroundColor: _primaryDark),
+                child: const Text("Reintentar", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showSnackBarError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.poppins()),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }

@@ -104,20 +104,32 @@ class ApiRepository {
     }
   }
 
-  Future<List<PlateRecord>> getPlateRecords() async {
-    try {
-      final response = await http.get(Uri.parse('$_baseUrl/api/registros'))
-          .timeout(const Duration(seconds: 10));
+ Future<List<PlateRecord>> getPlateRecords() async {
+  try {
+    final url = Uri.parse('http://192.168.31.11:8000/api/registros');
+    print("📡 Descargando datos pesados desde: $url");
 
-      if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        print("📋 Registros cargados: ${data.length}");
-        return data.map((json) => PlateRecord.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      print("❌ Error al obtener historial: $e");
+    final response = await http.get(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip", // Esto ayuda a que el servidor comprima los datos
+      },
+    ).timeout(const Duration(seconds: 60)); // <--- PONLE 1 MINUTO COMPLETO
+
+    if (response.statusCode == 200) {
+      // Usamos un decoder más eficiente para strings largos
+      final String responseBody = utf8.decode(response.bodyBytes);
+      final List<dynamic> data = jsonDecode(responseBody);
+      
+      print("✅ ¡Recibido! Procesando ${data.length} registros...");
+      return data.map((json) => PlateRecord.fromJson(json)).toList();
+    } else {
       return [];
     }
+  } catch (e) {
+    print("❌ Error: $e");
+    rethrow;
+  }
   }
 }
