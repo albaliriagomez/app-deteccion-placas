@@ -57,8 +57,14 @@ app.*.map.json
 **/*.pyc
 **/venv/
 **/env/
-**/.env
+
 
 # IDEs
 **/.idea/
 **/.vscode/
+
+# Seguridad: Variables de entorno
+.env
+.venv/
+env/
+venv/

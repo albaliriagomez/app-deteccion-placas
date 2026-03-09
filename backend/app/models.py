@@ -12,3 +12,4 @@ class RegistroPlaca(BaseModel):
     latitude: Optional[str] = "0.0"
     longitude: Optional[str] = "0.0"
     hora: Optional[str] = None
+    

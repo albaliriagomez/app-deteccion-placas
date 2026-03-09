@@ -26,6 +26,37 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
   static const Color _darkGray = Color(0xFF757575);
   static const Color _white = Color(0xFFFFFFFF);
 
+  // NUEVAS VARIABLES PARA CARGA DINÁMICA
+  final ApiRepository _apiRepository = ApiRepository();
+  String? _loadedImageData;
+  bool _isLoadingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si el objeto record viene sin imagen (porque optimizamos la lista), la pedimos
+    if (widget.record.imagen.isEmpty) {
+      _fetchFullImage();
+    } else {
+      _loadedImageData = widget.record.imagen;
+    }
+  }
+
+  Future<void> _fetchFullImage() async {
+    setState(() => _isLoadingImage = true);
+    try {
+      final fullImage = await _apiRepository.getFullImage(widget.record.id);
+      if (mounted) {
+        setState(() {
+          _loadedImageData = fullImage;
+          _isLoadingImage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingImage = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -37,32 +68,19 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Imagen del registro
             _buildImageSection(isDark),
-            
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Estado en la parte superior
                   _buildStatusBadge(isValid),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Tarjeta de información del registro
                   _buildInfoCard(isDark, isValid),
-                  
                   const SizedBox(height: 24),
-                  
-                  // Tarjeta de verificación
                   _buildVerificationCard(isDark),
-                  
                   const SizedBox(height: 32),
-                  
-                  // Botones de acción
                   _buildActionButtons(isDark),
-                  
                   const SizedBox(height: 20),
                 ],
               ),
@@ -70,6 +88,129 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // --- MÉTODOS DE UI ACTUALIZADOS ---
+
+  Widget _buildImageWidget() {
+    // 1. Si está cargando desde el API
+    if (_isLoadingImage) {
+      return const Center(
+        child: CircularProgressIndicator(color: _darkPurple),
+      );
+    }
+
+    final imagePath = _loadedImageData ?? "";
+    
+    // 2. Si no hay imagen disponible después de la carga
+    if (imagePath.isEmpty) {
+      return _buildNoImage();
+    }
+
+    // 3. Lógica Base64
+    if (imagePath.startsWith('/9j/') || imagePath.length > 500) {
+      try {
+        String base64String = imagePath;
+        if (imagePath.contains(',')) {
+          base64String = imagePath.split(',').last;
+        }
+        return Image.memory(
+          base64Decode(base64String.trim()),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildNoImage(),
+        );
+      } catch (e) {
+        return _buildNoImage();
+      }
+    } 
+
+    // 4. Si es una ruta de archivo local (para capturas recién hechas)
+    if (imagePath.startsWith('/') || imagePath.contains(':/')) {
+      return Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildNoImage(),
+      );
+    }
+
+    return _buildNoImage();
+  }
+
+  // El resto de tus métodos permanecen igual o con ajustes mínimos
+  Widget _buildImageSection(bool isDark) {
+    return Container(
+      width: double.infinity,
+      height: 300,
+      color: isDark ? const Color(0xFF2A2A2A) : _white,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildImageWidget(),
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.4), Colors.transparent],
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildMiniBadge(widget.record.estado),
+                  _buildZoneChip(widget.record.zona),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helpers pequeños para limpiar el código
+  Widget _buildMiniBadge(String estado) {
+    final isValido = estado == 'VÁLIDO';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isValido ? _successGreen : _errorRed,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(isValido ? Icons.check_circle : Icons.warning, color: _white, size: 18),
+          const SizedBox(width: 8),
+          Text(estado, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: _white)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildZoneChip(String zona) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(zona, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _white)),
+    );
+  }
+
+  // ... (Aquí van tus métodos _buildAppBar, _buildNoImage, _buildStatusBadge, 
+  // _buildInfoCard, _buildVerificationCard, _buildActionButtons y _formatDateTime 
+  // que ya tenías, no necesitan cambios mayores)
+  
+  // Nota: Asegúrate de mantener _buildNoImage() tal como lo tenías.
+  Widget _buildNoImage() {
+    return Container(
+      color: const Color(0xFFE0E0E0),
+      child: const Center(child: Icon(Icons.image_not_supported, size: 80, color: Color(0xFF757575))),
     );
   }
 
@@ -94,150 +235,11 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     );
   }
 
-  Widget _buildImageWidget() {
-    final imagePath = widget.record.imagen;
-    
-    if (imagePath.isEmpty) {
-      return _buildNoImage();
-    }
-
-    // Lógica Robusta: Si empieza con /9j/ es Base64 (JPEG)
-    if (imagePath.startsWith('/9j/') || imagePath.length > 500) {
-      try {
-        // Limpiar el string por si viene con prefijos data:image/jpeg;base64,
-        String base64String = imagePath;
-        if (imagePath.contains(',')) {
-          base64String = imagePath.split(',').last;
-        }
-        
-        return Image.memory(
-          base64Decode(base64String.trim()),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildNoImage(),
-        );
-      } catch (e) {
-        print("❌ Error decodificando Base64: $e");
-        return _buildNoImage();
-      }
-    } 
-
-    // Si es una ruta de archivo local
-    if (imagePath.startsWith('/') || imagePath.contains(':/')) {
-      return Image.file(
-        File(imagePath),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildNoImage(),
-      );
-    }
-
-    return _buildNoImage();
-  }
-
-  // Widget auxiliar para cuando no hay imagen
-  Widget _buildNoImage() {
-    return Container(
-      color: const Color(0xFFE0E0E0),
-      child: const Center(child: Icon(Icons.image_not_supported, size: 80, color: Color(0xFF757575))),
-    );
-  }
-
-  Widget _buildImageSection(bool isDark) {
-    return Container(
-      width: double.infinity,
-      height: 300,
-      color: isDark ? const Color(0xFF2A2A2A) : _white,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Imagen - detectar si es file path o base64
-          _buildImageWidget(),
-          
-          // Overlay superior con estado
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.4),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: widget.record.estado == 'VÁLIDO'
-                          ? _successGreen
-                          : _errorRed,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          widget.record.estado == 'VÁLIDO'
-                              ? Icons.check_circle
-                              : Icons.warning,
-                          color: _white,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          widget.record.estado,
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      widget.record.zona,
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatusBadge(bool isValid) {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          // Si es válido verde, si no rojo
           color: isValid ? _successGreen.withOpacity(0.15) : _errorRed.withOpacity(0.15),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -246,7 +248,7 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: isValid ? _successGreen : _errorRed, // Color de texto dinámico
+            color: isValid ? _successGreen : _errorRed,
             letterSpacing: 0.5,
           ),
         ),
@@ -260,10 +262,7 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2A2A2A) : _white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _mediumGray,
-          width: 1,
-        ),
+        border: Border.all(color: _mediumGray, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -275,131 +274,46 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Número de patente
-          Text(
-            'Número de Patente',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: _darkGray,
-              letterSpacing: 0.3,
-            ),
-          ),
+          Text('Número de Patente', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: _darkGray)),
           const SizedBox(height: 8),
-          Text(
-            widget.record.placa,
-            style: GoogleFonts.poppins(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: _darkPurple,
-              letterSpacing: 1.5,
-            ),
-          ),
-          
+          Text(widget.record.placa, style: GoogleFonts.poppins(fontSize: 36, fontWeight: FontWeight.w700, color: _darkPurple, letterSpacing: 1.5)),
           const SizedBox(height: 24),
-          
-          // Separador
-          Divider(color: _mediumGray, height: 1),
-          
+          const Divider(color: _mediumGray, height: 1),
           const SizedBox(height: 24),
-          
-          // Fecha y Hora
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Fecha y Hora',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: _darkGray,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _formatDateTime(widget.record.fecha),
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? _white : Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Supervisor',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: _darkGray,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.record.supervisor,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? _white : Colors.black,
-                    ),
-                  ),
-                ],
-              ),
+              _buildInfoItem('Fecha y Hora', _formatDateTime(widget.record.fecha), isDark),
+              _buildInfoItem('Supervisor', widget.record.supervisor, isDark),
             ],
           ),
-          
           const SizedBox(height: 24),
-          
-          // Ubicación
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Ubicación',
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: _darkGray,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _darkPurple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on,
-                      color: _darkPurple,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.record.ubicacion,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _darkPurple,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text('Ubicación', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _darkGray)),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(color: _darkPurple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, color: _darkPurple, size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text(widget.record.ubicacion, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: _darkPurple))),
+              ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoItem(String label, String value, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _darkGray)),
+        const SizedBox(height: 6),
+        Text(value, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? _white : Colors.black)),
+      ],
     );
   }
 
@@ -409,65 +323,24 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2A2A2A) : _white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _mediumGray,
-          width: 1,
-        ),
+        border: Border.all(color: _mediumGray, width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'Estado de Verificación',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: isDark ? _white : Colors.black,
-              letterSpacing: 0.3,
-            ),
+          Container(
+            width: 48, height: 48,
+            decoration: BoxDecoration(color: _successGreen.withOpacity(0.15), shape: BoxShape.circle),
+            child: const Icon(Icons.check_circle, color: _successGreen, size: 28),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: _successGreen.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: _successGreen,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Permiso Vigente',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? _white : Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'La patente tiene todos los permisos requeridos',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: _darkGray,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Permiso Vigente', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? _white : Colors.black)),
+                Text('La patente tiene todos los permisos requeridos', style: GoogleFonts.poppins(fontSize: 11, color: _darkGray)),
+              ],
+            ),
           ),
         ],
       ),
@@ -477,118 +350,48 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
   Widget _buildActionButtons(bool isDark) {
     return Column(
       children: [
-        // Botón Imprimir
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF3A3A3A) : _white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _mediumGray,
-              width: 1,
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Función de impresión en desarrollo',
-                      style: GoogleFonts.poppins(),
-                    ),
-                    backgroundColor: _darkPurple,
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.print, color: _darkPurple),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Imprimir',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _darkPurple,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        
+        _buildButton(Icons.print, 'Imprimir', _darkPurple, isDark ? const Color(0xFF3A3A3A) : _white, _darkPurple),
         const SizedBox(height: 12),
-        
-        // Botón Editar
-        Container(
-          decoration: BoxDecoration(
-            color: _darkPurple,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Función de edición en desarrollo',
-                      style: GoogleFonts.poppins(),
-                    ),
-                    backgroundColor: _darkPurple,
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.edit, color: _white),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Editar Registro',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        _buildButton(Icons.edit, 'Editar Registro', _white, _darkPurple, _white),
+      ],
+    );
+  }
+
+  Widget _buildButton(IconData icon, String label, Color textColor, Color bgColor, Color iconColor) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: bgColor == _white || bgColor == const Color(0xFF3A3A3A) ? Border.all(color: _mediumGray) : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: iconColor),
+                const SizedBox(width: 12),
+                Text(label, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: textColor)),
+              ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
   String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
     final recordDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-
-    String dayLabel;
-    if (recordDate == today) {
-      dayLabel = 'Hoy';
-    } else if (recordDate == yesterday) {
-      dayLabel = 'Ayer';
-    } else {
-      dayLabel = '${recordDate.day}/${recordDate.month}/${recordDate.year}';
-    }
-
-    final timeStr =
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    String dayLabel = recordDate == today ? 'Hoy' : '${recordDate.day}/${recordDate.month}/${recordDate.year}';
+    final timeStr = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     return '$dayLabel • $timeStr';
   }
 }

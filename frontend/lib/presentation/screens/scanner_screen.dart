@@ -92,7 +92,7 @@ class _ScannerScreenState extends State<ScannerScreen>  {
 
       _controller = CameraController(
         backCamera, 
-        ResolutionPreset.high, 
+        ResolutionPreset.medium, 
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420, // Agregado para compatibilidad Android
       );

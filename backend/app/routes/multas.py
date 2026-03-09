@@ -9,20 +9,20 @@ async def get_all_registros():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Traemos solo lo necesario para que sea veloz
+        # ⚡️ CLAVE: NO pedimos imagen_path aquí para que el JSON sea liviano
         cursor.execute("""
-            SELECT id, placa, ubicacion, imagen_path AS imagen, estado, fecha 
+            SELECT id, placa, ubicacion, estado, fecha 
             FROM placas 
-            ORDER BY fecha DESC LIMIT 50
+            ORDER BY fecha DESC LIMIT 100
         """)
         datos = cursor.fetchall()
         
         for row in datos:
-            # Aseguramos que la fecha sea siempre un string ISO para Flutter
             if row['fecha'] and not isinstance(row['fecha'], str):
                 row['fecha'] = row['fecha'].isoformat()
             
-            # Campos que Flutter espera para no explotar
+            # Enviamos un placeholder o vacío para la imagen en la lista
+            row['imagen'] = "" 
             row['zona'] = 'Zona A'
             row['supervisor'] = 'ADMIN'
                 
@@ -60,6 +60,25 @@ async def guardar_placa(data: dict):
     except Exception as e:
         conn.rollback()
         print(f"❌ ERROR EN POST: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        conn.close()
+@router.get("/registros/{id}/imagen")
+async def get_registro_imagen(id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Buscamos solo la imagen para ese ID específico
+        cursor.execute("SELECT imagen_path FROM placas WHERE id = %s", (id,))
+        result = cursor.fetchone()
+        
+        if result:
+            return {"id": id, "imagen": result['imagen_path']}
+        else:
+            raise HTTPException(status_code=404, detail="Imagen no encontrada")
+    except Exception as e:
+        print(f"❌ Error al obtener imagen: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
