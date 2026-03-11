@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart'; // Asegúrate de tener intl en pubspec.yaml
 import '../../data/api_repository.dart';
 import 'record_detail_screen.dart';
 
@@ -26,7 +27,6 @@ class RecordsScreenState extends State<RecordsScreen> {
   final ApiRepository _apiRepository = ApiRepository();
   final TextEditingController _searchController = TextEditingController();
   
-  // CAMBIO: Ahora usamos el tipo PlateRecord definido en tu repositorio
   List<PlateRecord> _allRecords = []; 
   List<PlateRecord> _filteredRecords = []; 
   
@@ -62,9 +62,7 @@ class RecordsScreenState extends State<RecordsScreen> {
     });
     
     try {
-      // Llamamos al repo que ya devuelve List<PlateRecord>
       final List<PlateRecord> records = await _apiRepository.getPlateRecords();
-
       if (mounted) {
         setState(() {
           _allRecords = records;
@@ -75,7 +73,6 @@ class RecordsScreenState extends State<RecordsScreen> {
     } on TimeoutException {
       _handleError("El servidor tardó demasiado en responder.");
     } catch (e) {
-      print("Error detallado: $e");
       _handleError("No se pudo conectar con el servidor.");
     }
   }
@@ -96,7 +93,6 @@ class RecordsScreenState extends State<RecordsScreen> {
 
     setState(() {
       _filteredRecords = _allRecords.where((record) {
-        // CAMBIO: Acceso mediante punto (record.placa) porque es un objeto
         final matchesSearch = record.placa.toLowerCase().contains(query);
         final recordDate = record.fecha;
         
@@ -117,7 +113,34 @@ class RecordsScreenState extends State<RecordsScreen> {
     });
   }
 
-  // --- UI WIDGETS ---
+  Map<String, dynamic> _getStatusConfig(String estado) {
+    switch (estado.toUpperCase()) {
+      case 'INFRACCIÓN':
+      case 'INFRACCION':
+        return {
+          'color': const Color(0xFFFFE9E9),
+          'iconColor': Colors.redAccent,
+          'icon': Icons.gavel_rounded,
+          'labelColor': Colors.red.shade800,
+        };
+      case 'NO REGISTRADO':
+        return {
+          'color': const Color(0xFFFFF4E5),
+          'iconColor': Colors.orangeAccent,
+          'icon': Icons.warning_amber_rounded,
+          'labelColor': Colors.orange.shade900,
+        };
+      case 'VÁLIDO':
+      case 'VALIDO':
+      default:
+        return {
+          'color': const Color(0xFFE8F5E9),
+          'iconColor': Colors.green,
+          'icon': Icons.check_circle_outline_rounded,
+          'labelColor': Colors.green.shade800,
+        };
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -130,25 +153,26 @@ class RecordsScreenState extends State<RecordsScreen> {
             color: _primaryDark,
             child: Column(
               children: [
-                const SizedBox(height: 50),
+                // Ajuste de espacio superior para que pegue más arriba
+                const SizedBox(height: 50), 
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
                       _buildSearchBar(),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 12),
                       _buildTimeFilters(),
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 Expanded(
                   child: _errorMessage != null 
                       ? _buildErrorState()
                       : _filteredRecords.isEmpty
                           ? _buildEmptyState()
                           : ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 100, top: 10),
+                              padding: const EdgeInsets.only(bottom: 100, top: 5),
                               itemCount: _filteredRecords.length,
                               itemBuilder: (context, index) => _buildRecordCard(_filteredRecords[index]),
                             ),
@@ -159,50 +183,121 @@ class RecordsScreenState extends State<RecordsScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: widget.onNavigateToScanner,
         backgroundColor: _primaryDark,
-        child: const Icon(Icons.qr_code_scanner, color: Colors.white),
+        elevation: 4,
+        child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   Widget _buildRecordCard(PlateRecord record) {
-  return Card(
-    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-    child: ListTile(
-      onTap: () {
-        // Al tocar, vamos al detalle. El detalle se encargará de pedir la foto.
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
-        );
-      },
-      leading: const CircleAvatar(
-        backgroundColor: Color(0xFFF8FAFF), 
-        child: Icon(Icons.directions_car, color: Color(0xFF2D2D5E))
-      ),
-      title: Text(record.placa, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text("${record.fecha.day}/${record.fecha.month}/${record.fecha.year}"),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-    ),
-  );
-}
+    final config = _getStatusConfig(record.estado);
+    // Formateo de fecha y hora
+    final String dateStr = DateFormat('dd/MM/yyyy').format(record.fecha);
+    final String hourStr = DateFormat('HH:mm').format(record.fecha);
 
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => RecordDetailScreen(record: record)),
+          );
+        },
+        contentPadding: const EdgeInsets.all(12),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: config['color'],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(config['icon'], color: config['iconColor'], size: 24),
+        ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              record.placa,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryDark),
+            ),
+            Text(
+              "$dateStr • $hourStr",
+              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 14, color: _accentBlue),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      record.ubicacion, // Muestra la calle/avenida real
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (config['color'] as Color),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  record.estado.toUpperCase(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 9, 
+                    fontWeight: FontWeight.bold, 
+                    color: config['labelColor']
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+      ),
+    );
+  }
 
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]
       ),
       child: TextField(
         controller: _searchController,
-        decoration: const InputDecoration(
+        style: GoogleFonts.poppins(fontSize: 14),
+        decoration: InputDecoration(
           hintText: 'Buscar por patente...',
-          prefixIcon: Icon(Icons.search, color: _accentBlue),
+          hintStyle: GoogleFonts.poppins(color: Colors.grey.shade400, fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: _accentBlue),
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),
       ),
     );
@@ -215,7 +310,7 @@ class RecordsScreenState extends State<RecordsScreen> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: filters.map((filter) => Padding(
-          padding: const EdgeInsets.only(right: 8.0),
+          padding: const EdgeInsets.only(right: 8),
           child: ChoiceChip(
             label: Text(filter),
             selected: _selectedTimeFilter == filter,
@@ -225,8 +320,14 @@ class RecordsScreenState extends State<RecordsScreen> {
                 _applyFilters();
               }
             },
+            elevation: 0,
+            backgroundColor: Colors.white,
             selectedColor: _primaryDark,
-            labelStyle: TextStyle(color: _selectedTimeFilter == filter ? Colors.white : _primaryDark),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide.none),
+            labelStyle: GoogleFonts.poppins(
+              fontSize: 12,
+              color: _selectedTimeFilter == filter ? Colors.white : _primaryDark,
+            ),
           ),
         )).toList(),
       ),
@@ -234,43 +335,28 @@ class RecordsScreenState extends State<RecordsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(child: Text('Sin registros', style: GoogleFonts.poppins(color: Colors.grey)));
+    return Center(
+      child: Text('Sin registros encontrados', style: GoogleFonts.poppins(color: Colors.grey)),
+    );
   }
 
   Widget _buildErrorState() {
-    return ListView(
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-        Center(
-          child: Column(
-            children: [
-              Icon(Icons.cloud_off_rounded, size: 80, color: Colors.red.withOpacity(0.3)),
-              const SizedBox(height: 15),
-              Text(
-                _errorMessage ?? "Error de conexión",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: Colors.grey.shade700),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _loadRecords,
-                style: ElevatedButton.styleFrom(backgroundColor: _primaryDark),
-                child: const Text("Reintentar", style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 60, color: Colors.redAccent),
+          const SizedBox(height: 15),
+          Text(_errorMessage ?? "Error", style: GoogleFonts.poppins()),
+          TextButton(onPressed: _loadRecords, child: const Text("Reintentar"))
+        ],
+      ),
     );
   }
 
   void _showSnackBarError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: GoogleFonts.poppins()),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
     );
   }
 }

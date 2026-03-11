@@ -13,50 +13,53 @@ SEM_LOGIN_URL = "https://semapidev.cochabamba.bo/api/v1/auth-sem-person/app-sem"
 
 @router.post("/login")
 async def login(auth: LoginRequest):
+    print(f"🔑 Intento de login para: {auth.username}")
     payload = {
         "email": auth.username,
         "password": auth.password
     }
 
     try:
+        print(f"📡 Conectando con SEM: {SEM_LOGIN_URL}...")
+        
+        # Bajamos el timeout a 7 segundos para no hacer esperar tanto al usuario
         sem_response = requests.post(
             SEM_LOGIN_URL,
             json=payload,
-            timeout=15,
+            timeout=7, 
             verify=False
         )
         
-        # LOGS DE DEPURACIÓN
-        print(f"DEBUG STATUS: {sem_response.status_code}")
+        print(f"DEBUG STATUS SEM: {sem_response.status_code}")
         
-        # SEM devuelve 200 o 201 cuando es exitoso
         if sem_response.status_code in [200, 201]:
             sem_data = sem_response.json()
+            print(f"✅ Respuesta SEM recibida: {sem_data.get('ok')}")
             
-            # Verificamos 'ok' de forma más flexible
             if sem_data.get("ok") == True or sem_data.get("ok") == "true":
                 data = sem_data.get("data", {})
                 token = data.get("token")
                 
-                # Si no hay objeto 'user', usamos datos del nivel superior
-                user_info = data.get("user") or data 
+                # Extraemos el nombre real y el cargo
+                employee_name = data.get("employee", "Usuario SEM")
+                job_title = data.get("type", "PERSONAL")
 
-                # Guardamos en la sesión global
                 sem_session.SEM_ACTIVE_TOKEN = token
                 sem_session.SEM_EMAIL = auth.username
 
                 return {
                     "status": "success",
-                    "role": "SUPERVISOR",
-                    "username": user_info.get("email") or auth.username,
+                    "role": job_title,       
+                    "username": employee_name, 
                     "sem_token": token
                 }
         
-        # Si llegamos aquí, el status no fue 200/201 o 'ok' no fue true
-        print(f"❌ Fallo de autenticación SEM: {sem_response.text}")
-        raise HTTPException(status_code=401, detail="Credenciales SEM incorrectas")
+        print(f"❌ Fallo de autenticación SEM. Status: {sem_response.status_code}")
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos en SEM")
 
+    except requests.exceptions.Timeout:
+        print("⏰ ERROR: El servidor de SEM tardó demasiado en responder (Timeout)")
+        raise HTTPException(status_code=504, detail="El servicio de la alcaldía no responde")
     except Exception as e:
-        print(f"❌ ERROR EN LOGIN: {str(e)}")
-        # Importante: No lances 401 si es un error de código, para poder debuguear
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+        print(f"❌ ERROR CRÍTICO EN LOGIN: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error de conexión: {str(e)}")

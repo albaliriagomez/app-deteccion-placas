@@ -352,7 +352,6 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
       children: [
         _buildButton(Icons.print, 'Imprimir', _darkPurple, isDark ? const Color(0xFF3A3A3A) : _white, _darkPurple),
         const SizedBox(height: 12),
-        _buildButton(Icons.edit, 'Editar Registro', _white, _darkPurple, _white),
       ],
     );
   }
