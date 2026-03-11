@@ -160,9 +160,8 @@ class SideMenuDrawer extends StatelessWidget {
                 onTap: () => onItemSelected(3),
               ),
 
-              const Spacer(), // Empuja todo lo siguiente hacia abajo
+              const Spacer(), 
 
-              // --- LOGO ANTES DE CERRAR SESIÓN ---
               Container(
                 margin: const EdgeInsets.only(bottom: 20),
                 height: 70, // Tamaño ajustado
