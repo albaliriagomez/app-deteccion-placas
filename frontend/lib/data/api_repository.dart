@@ -47,7 +47,7 @@ class PlateRecord {
 
 class ApiRepository {
   // RECUERDA: Asegúrate de que esta IP coincida con la de tu servidor actual
-  static const String _baseUrl = 'http://192.168.31.11:8000'; 
+  static const String _baseUrl = 'http://172.16.51.155:8000'; 
 
   Future<Map<String, dynamic>> savePlateRecord(
     String plate, 
@@ -123,7 +123,7 @@ Future<String?> getFullImage(int id) async {
 
  Future<List<PlateRecord>> getPlateRecords() async {
   try {
-    final url = Uri.parse('http://192.168.31.11:8000/api/registros');
+    final url = Uri.parse('http://172.16.51.155:8000/api/registros');
     print("📡 Descargando datos pesados desde: $url");
 
     final response = await http.get(
