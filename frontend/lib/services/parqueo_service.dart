@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-
 class ParqueoService {
-
-  static const String baseUrl = "http://192.168.31.11:8000/api";
+  static const String baseUrl = "http://172.16.51.155:8000/api";
 
   static Future<Map<String, dynamic>> verificarParqueo({
     required String token,
@@ -14,7 +12,6 @@ class ParqueoService {
     required String latitude,
     required String longitude,
   }) async {
-
     final response = await http.post(
       Uri.parse("$baseUrl/verificar-parqueo"),
       headers: {
@@ -31,10 +28,33 @@ class ParqueoService {
     );
 
     if (response.statusCode == 200) {
-      print(response.body);
       return jsonDecode(response.body);
     } else {
       throw Exception("Error servidor: ${response.body}");
+    }
+  }
+
+  static Future<void> notificarInfraccion({
+    required String token,
+    required String placa,
+    required String latitude,
+    required String longitude,
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/notificar-infraccion"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token"
+      },
+      body: jsonEncode({
+        "placa": placa,
+        "latitude": latitude,
+        "longitude": longitude,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Error notificando: ${response.body}");
     }
   }
 }

@@ -9,7 +9,7 @@ import 'verificando_screen.dart';
 
 class ConfirmationScreen extends StatefulWidget {
   final String plate;
-  final String base64Image; // ← ahora recibe base64, no path
+  final String base64Image;
   final String location;
   final String latitude;
   final String longitude;
@@ -34,7 +34,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   final ApiRepository _apiRepository = ApiRepository();
   bool _isSaving = false;
 
-  // Colores
   static const Color _darkPurple = Color(0xFF311B92);
   static const Color _successGreen = Color(0xFF8BC34A);
   static const Color _lightGray = Color(0xFFF5F5F5);
@@ -43,8 +42,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   static const Color _white = Color(0xFFFFFFFF);
 
   bool _isEditing = false;
-
-  // Bytes de la imagen decodificados una sola vez
   late final Uint8List _imageBytes;
 
   @override
@@ -60,7 +57,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -95,7 +91,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: _white,
@@ -116,7 +111,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   Widget _buildProgressIndicator() {
     return Center(
       child: Container(
@@ -164,13 +158,13 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Container(
-          width: 40, height: 2, color: filled ? _darkPurple : _mediumGray),
+        width: 40,
+        height: 2,
+        color: filled ? _darkPurple : _mediumGray,
+      ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Imagen desde bytes en memoria — no necesita File en disco
-  // ─────────────────────────────────────────────────────────────
   Widget _buildCapturedImage() {
     return Center(
       child: Container(
@@ -188,7 +182,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
         ),
         child: Stack(
           children: [
-            // ← Image.memory en lugar de Image.file
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.memory(
@@ -218,7 +211,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   Widget _buildPlateEditField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,7 +221,9 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
             Text(
               'Número de patente',
               style: GoogleFonts.poppins(
-                  fontSize: 14, fontWeight: FontWeight.w500, color: _darkGray),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _darkGray),
             ),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
@@ -300,7 +294,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                     decoration: BoxDecoration(
                         color: _darkPurple.withOpacity(0.1),
                         shape: BoxShape.circle),
-                    child: const Icon(Icons.edit, color: _darkPurple, size: 20),
+                    child:
+                        const Icon(Icons.edit, color: _darkPurple, size: 20),
                   ),
                 ),
               ],
@@ -311,7 +306,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   Widget _buildHelpText() {
     return Text(
       'Revise el texto. Puede editarlo si hubo un error en el escaneo.',
@@ -337,7 +331,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
                 color: _darkPurple.withOpacity(0.1), shape: BoxShape.circle),
-            child: const Icon(Icons.location_on, color: _darkPurple, size: 20),
+            child:
+                const Icon(Icons.location_on, color: _darkPurple, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -363,7 +358,6 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
@@ -428,59 +422,31 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  Guardar: usa base64Image ya en memoria, sin leer File
+  // ✅ CORREGIDO: guarda datos en SessionManager ANTES de navegar
   // ─────────────────────────────────────────────────────────────
-
   Future<void> _onConfirm() async {
+    final placa = _plateController.text.trim().toUpperCase();
+
+    // Guardamos los datos de entrada en SessionManager para que
+    // VerificandoScreen los use y no los pierda
+    SessionManager.ultimaPlaca = placa;
+    SessionManager.ultimaLatitud = widget.latitude;
+    SessionManager.ultimaLongitud = widget.longitude;
+
+    // Navegar a VerificandoScreen con los datos necesarios
     Navigator.push(
       context,
       MaterialPageRoute(
-      builder: (_) => VerificandoScreen(
-        data: {
-          "placa": _plateController.text.trim().toUpperCase(),
-          "base64Image": widget.base64Image,
-          "ubicacion": widget.location,
-          "latitude": widget.latitude,
-          "longitude": widget.longitude,
-        },
+        builder: (_) => VerificandoScreen(
+          data: {
+            "placa": placa,
+            "base64Image": widget.base64Image,
+            "ubicacion": widget.location,
+            "latitude": widget.latitude,
+            "longitude": widget.longitude,
+          },
+        ),
       ),
-    ),
     );
-
-    try {
-      print("OBTENIENDO TOKEN...");
-      final token = SessionManager.semToken;
-
-      if (token == null) {
-        print("TOKEN ES NULL ❌");
-        Navigator.pop(context);
-        return;
-      }
-
-      print("TOKEN OK ✅");
-
-      final result = await ParqueoService.verificarParqueo(
-        token: token,
-        placa: _plateController.text.trim().toUpperCase(),
-        base64Image: widget.base64Image,
-        ubicacion: widget.location,
-        latitude: widget.latitude,
-        longitude: widget.longitude,
-      );
-      print("RESULTADO COMPLETO: $result");
-
-      print("RESULTADO: $result");
-
-      if (!mounted) return;
-
-      Navigator.pushReplacementNamed(
-        context,
-        '/resultadoVerificacion',
-        arguments: result,
-      );
-    } catch (e) {
-      print("ERROR EN VERIFICACION ❌: $e");
-      if (mounted) Navigator.pop(context);
-    }
   }
 }
