@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/env_config.dart';
 
 // Modelo de datos para registros de patentes
 class PlateRecord {
@@ -47,7 +48,7 @@ class PlateRecord {
 
 class ApiRepository {
   // RECUERDA: Asegúrate de que esta IP coincida con la de tu servidor actual
-  static const String _baseUrl = 'http://172.16.51.155:8000'; 
+  static const String _baseUrl = EnvConfig.baseUrl; 
 
   Future<Map<String, dynamic>> savePlateRecord(
     String plate, 
@@ -123,7 +124,7 @@ Future<String?> getFullImage(int id) async {
 
  Future<List<PlateRecord>> getPlateRecords() async {
   try {
-    final url = Uri.parse('http://172.16.51.155:8000/api/registros');
+    final url = Uri.parse('$_baseUrl/api/registros');
     print("📡 Descargando datos pesados desde: $url");
 
     final response = await http.get(

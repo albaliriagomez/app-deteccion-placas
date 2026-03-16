@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/env_config.dart';
 
 class ParqueoService {
-  static const String baseUrl = "http://172.16.51.155:8000/api";
+  static const String baseUrl = EnvConfig.apiBaseUrl;
 
   static Future<Map<String, dynamic>> verificarParqueo({
     required String token,

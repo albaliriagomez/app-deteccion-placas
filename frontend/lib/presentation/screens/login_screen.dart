@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../services/session_manager.dart';
+import '../../core/config/env_config.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,9 +29,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final url = Uri.parse('${EnvConfig.baseUrl}/api/login');
+      
       final response = await http.post(
-        Uri.parse('http://172.16.51.155:8000/api/login'),
-
+        url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _userController.text.trim(),
@@ -55,6 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _showError("Usuario o contraseña incorrectos");
       }
     } catch (e) {
+      print("❌ Error en Login: $e"); 
       _showError("Error de conexión con el servidor");
     } finally {
       if (mounted) setState(() => _isLoading = false);
