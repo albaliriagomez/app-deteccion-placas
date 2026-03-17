@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api", tags=["Parqueo"])
 
 SEM_LOGIN_URL   = "https://semapidev.cochabamba.bo/api/v1/auth-sem-person/app-sem"
 SEM_PARKING_URL = "https://semapidev.cochabamba.bo/api/v1/appsem/report/parkings/search"
+SEM_NOTIFICATION_URL = "https://semapidev.cochabamba.bo/api/v1/appsem/notification"
 
 def sem_login():
     payload = {"email": sem_session.SEM_EMAIL, "password": sem_session.SEM_PASSWORD}
@@ -147,5 +148,65 @@ async def verificar_parqueo(data: dict, authorization: str = Header(None)):
 
     except Exception as e:
         print(f"🔥 ERROR CRÍTICO: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/notificar-infraccion")
+async def notificar_infraccion(data: dict, authorization: str = Header(None)):
+    print("\n" + "🚨" * 20)
+    print(f"ENVIANDO NOTIFICACIÓN DE INFRACCIÓN: {datetime.now().strftime('%H:%M:%S')}")
+    
+    placa = data.get("placa", "").strip().upper()
+    lat = str(data.get("latitude", "0.0"))
+    lon = str(data.get("longitude", "0.0"))
+
+    print(f"🚗 Vehículo: {placa}")
+    print(f"📍 Coordenadas: {lat}, {lon}")
+
+    try:
+        # 1. Definimos los datos primero
+        payload = {
+            "placa": placa,
+            "latitude": lat,
+            "longitude": lon
+        }
+        headers = {"Authorization": sem_session.SEM_ACTIVE_TOKEN}
+        
+        print("📡 Conectando con servidor SEM Notification...")
+        
+        # 2. Primer intento
+        response = requests.post(
+            SEM_NOTIFICATION_URL, 
+            json=payload, 
+            headers=headers, 
+            timeout=10, 
+            verify=False
+        )
+
+        # 3. Lógica de reintento si el token expiró (401)
+        if response.status_code == 401:
+            print("🔑 Token expirado en notificación. Renovando...")
+            new_token = sem_login()
+            headers = {"Authorization": new_token}
+            response = requests.post(
+                SEM_NOTIFICATION_URL, 
+                json=payload, 
+                headers=headers, 
+                timeout=10, 
+                verify=False
+            )
+
+        # 4. Verificar resultado final
+        if response.status_code in [200, 201]:
+            sem_data = response.json()
+            print(f"✅ SEM CONFIRMÓ RECEPCIÓN: {sem_data.get('msg', 'OK')}")
+            print("🚨" * 20 + "\n")
+            return {"ok": True, "data": sem_data}
+        else:
+            print(f"❌ Error en SEM Notification ({response.status_code}): {response.text}")
+            raise HTTPException(status_code=response.status_code, detail="Error en servidor SEM")
+
+    except Exception as e:
+        print(f"🔥 Error al notificar: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

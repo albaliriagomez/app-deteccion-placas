@@ -1,26 +1,26 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/config/env_config.dart'; // <--- Importamos el config
 
 class NotificacionService {
-  // ✅ URL CORRECTA según la documentación SEM
-  static const String url =
-      "https://semapidev.cochabamba.bo/api/v1/appsem/notification";
+  // ✅ Ahora apunta a TU backend, no al del SEM directamente
+  static const String endpoint = "/notificar-infraccion";
 
   static Future<void> enviarNotificacion({
-    required String token,
+    required String token, // Token de tu app (SessionManager.semToken)
     required String placa,
     required String latitude,
     required String longitude,
   }) async {
-    print("📤 Enviando notificación para placa: $placa");
-    print("📍 Coords: lat=$latitude, lon=$longitude");
+    
+    // Construimos la URL usando tu EnvConfig centralizado
+    final url = Uri.parse("${EnvConfig.apiBaseUrl}$endpoint");
 
     final response = await http.post(
-      Uri.parse(url),
+      url,
       headers: {
         "Content-Type": "application/json",
-        // ✅ SIN "Bearer" — igual que el backend
-        "Authorization": token
+        "Authorization": "Bearer $token" // Aquí sí solemos usar Bearer para tu backend
       },
       body: jsonEncode({
         "placa": placa,
@@ -29,11 +29,8 @@ class NotificacionService {
       }),
     );
 
-    print("📡 NOTIFICACION STATUS: ${response.statusCode}");
-    print("📡 NOTIFICACION BODY: ${response.body}");
-
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception("Error enviando notificación: ${response.statusCode} - ${response.body}");
+      throw Exception("Error en servidor local: ${response.statusCode}");
     }
   }
 }

@@ -3,6 +3,7 @@ import '../../services/session_manager.dart';
 import 'menu_screen.dart';
 import 'scanner_screen.dart';
 import 'records_screen.dart';
+import 'mapa_zonas_screen.dart';
 
 class AppShell extends StatefulWidget {
   final int initialIndex;
@@ -40,7 +41,7 @@ class _AppShellState extends State<AppShell> {
       case 0: return const MenuScreen();
       case 1: return const ScannerScreen();
       case 2: return RecordsScreen(onNavigateToScanner: () => setState(() => _index = 1));
-      case 3: return const MapPlaceholderScreen();
+      case 3: return const MapaZonasScreen();
       default: return const MenuScreen();
     }
   }
