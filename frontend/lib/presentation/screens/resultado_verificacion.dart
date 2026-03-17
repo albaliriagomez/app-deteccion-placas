@@ -251,8 +251,7 @@ class _ResultadoVerificacionScreenState
                       width: double.infinity,
                       height: 60,
                       child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _notificarInfraccion(context),
+                        onPressed: _notificando ? null : () => _notificarInfraccion(context), 
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(
@@ -285,7 +284,8 @@ class _ResultadoVerificacionScreenState
   }
 
   Future<void> _notificarInfraccion(BuildContext context) async {
-    // ✅ Datos vienen de SessionManager — nunca vacíos
+    if (_notificando) return;
+
     debugPrint("🔔 NOTIFICANDO — placa: $_placa | lat: $_lat | lon: $_lon");
 
     if (_placa.isEmpty) {

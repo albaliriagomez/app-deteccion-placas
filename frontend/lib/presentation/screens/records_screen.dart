@@ -114,30 +114,34 @@ class RecordsScreenState extends State<RecordsScreen> {
   }
 
   Map<String, dynamic> _getStatusConfig(String estado) {
-    switch (estado.toUpperCase()) {
-      case 'INFRACCIÓN':
-      case 'INFRACCION':
+    switch (estado.trim()) {
+      case 'Pago Vigente':
         return {
-          'color': const Color(0xFFFFE9E9),
-          'iconColor': Colors.redAccent,
-          'icon': Icons.gavel_rounded,
+          'color':      const Color(0xFFE8F5E9),
+          'iconColor':  Colors.green,
+          'icon':       Icons.check_circle_outline_rounded,
+          'labelColor': Colors.green.shade800,
+        };
+      case 'Pago Vencido':
+        return {
+          'color':      const Color(0xFFFFE9E9),
+          'iconColor':  Colors.redAccent,
+          'icon':       Icons.gavel_rounded,
           'labelColor': Colors.red.shade800,
         };
-      case 'NO REGISTRADO':
+      case 'No Registrado':
         return {
-          'color': const Color(0xFFFFF4E5),
-          'iconColor': Colors.orangeAccent,
-          'icon': Icons.warning_amber_rounded,
+          'color':      const Color(0xFFFFF4E5),
+          'iconColor':  Colors.orange,
+          'icon':       Icons.warning_amber_rounded,
           'labelColor': Colors.orange.shade900,
         };
-      case 'VÁLIDO':
-      case 'VALIDO':
       default:
         return {
-          'color': const Color(0xFFE8F5E9),
-          'iconColor': Colors.green,
-          'icon': Icons.check_circle_outline_rounded,
-          'labelColor': Colors.green.shade800,
+          'color':      const Color(0xFFF0F0F0),
+          'iconColor':  Colors.grey,
+          'icon':       Icons.help_outline_rounded,
+          'labelColor': Colors.grey.shade700,
         };
     }
   }

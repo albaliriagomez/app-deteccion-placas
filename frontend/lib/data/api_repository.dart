@@ -11,39 +11,45 @@ class PlateRecord {
   final String estado;     
   final String zona;       
   final String supervisor; 
-  final String ubicacion;  
+  final String ubicacion; 
+  final double? latitude;  
+  final double? longitude; 
 
   PlateRecord({
     required this.id,
     required this.placa,
     required this.fecha,
     required this.imagen,
-    this.estado = 'VÁLIDO',
-    this.zona = 'Zona A',
-    this.supervisor = 'ADMIN',
-    this.ubicacion = 'Ubicación no disponible',
+    required this.estado,
+    required this.ubicacion,
+    required this.zona,      
+    required this.supervisor,
+    this.latitude,
+    this.longitude,
   });
 
   factory PlateRecord.fromJson(Map<String, dynamic> json) {
-  // 1. Limpieza de caracteres raros en el estado
-  String estadoOriginal = json['estado'] ?? 'VÁLIDO';
-  if (estadoOriginal.contains('VÃ')) estadoOriginal = 'VÁLIDO';
+    double? lat = double.tryParse(json['latitude']?.toString() ?? '');
+    double? lon = double.tryParse(json['longitude']?.toString() ?? ''); 
+    
+    String estadoOriginal = json['estado'] ?? 'VÁLIDO';
+    if (estadoOriginal.contains('VÃ')) estadoOriginal = 'VÁLIDO';
 
-  // 2. Prioridad absoluta a la dirección textual
-  // Buscamos en todos los nombres posibles que el backend pueda devolver
-  String direccionTexto = json['ubicacion'] ?? json['location'] ?? 'Ubicación no disponible';
+    String direccionTexto = json['ubicacion'] ?? json['location'] ?? 'Ubicación no disponible';
 
-  return PlateRecord(
-    id: json['id'] ?? 0,
-    placa: json['placa'] ?? json['plate'] ?? '---',
-    fecha: json['fecha'] != null ? DateTime.parse(json['fecha']) : DateTime.now(),
-    imagen: json['imagen'] ?? json['imagen_path'] ?? '',
-    estado: estadoOriginal,
-    zona: json['zona'] ?? 'Zona A',
-    supervisor: json['supervisor'] ?? 'ADMIN',
-    ubicacion: direccionTexto, // Aquí ya va la calle/avenida
-  );
-}
+    return PlateRecord(
+      id: json['id'] ?? 0,
+      placa: json['placa'] ?? json['plate'] ?? '---',
+      fecha: json['fecha'] != null ? DateTime.parse(json['fecha']) : DateTime.now(),
+      imagen: json['imagen'] ?? json['imagen_path'] ?? '',
+      estado: estadoOriginal,
+      ubicacion: direccionTexto,
+      latitude: lat,
+      longitude: lon,
+      zona: json['zona'] ?? 'Zona A',
+      supervisor: json['supervisor'] ?? 'ADMIN',
+    );
+  }
 }
 
 class ApiRepository {
@@ -150,4 +156,20 @@ Future<String?> getFullImage(int id) async {
     rethrow;
   }
   }
+  Future<Map<String, dynamic>> getDashboardStats() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/dashboard'),
+      headers: {"Content-Type": "application/json"},
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    return {};
+  } catch (e) {
+    print("❌ Error dashboard: $e");
+    rethrow;
+  }
+}
 }
