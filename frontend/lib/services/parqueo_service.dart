@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/env_config.dart';
+import 'session_manager.dart';
 
 class ParqueoService {
   static const String baseUrl = EnvConfig.apiBaseUrl;
@@ -25,6 +26,7 @@ class ParqueoService {
         "ubicacion": ubicacion,
         "latitude": latitude,
         "longitude": longitude,
+        "usuario_email":  SessionManager.userEmail ?? "desconocido",
       }),
     );
 

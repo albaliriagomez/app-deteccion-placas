@@ -30,6 +30,9 @@ dependencies:
   flutter_vision: ^1.1.4 
   image: ^4.1.7
 
+
+  shared_preferences: ^2.0.15
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
