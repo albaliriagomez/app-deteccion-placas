@@ -41,4 +41,5 @@ flutter:
   assets:
     - assets/best_int8.tflite
     - assets/labels.txt
+    - assets/Escudo-GAMC-vertical_CMYK.png
     - assets/Logo Yo Amo Cocha Oficial 1.png

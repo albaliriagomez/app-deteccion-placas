@@ -1,320 +1,163 @@
 import 'dart:async';
-
 import 'dart:io';
-
 import 'package:camera/camera.dart';
-
 import 'package:flutter/material.dart';
-
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:geolocator/geolocator.dart';
-
 import 'package:geocoding/geocoding.dart';
-
 import '../../core/services/ai_scanner_service.dart';
-
 import 'confirmation_screen.dart';
-
 import '../../data/api_repository.dart';
-
 import 'records_screen.dart';
 
-
-
 class ScannerScreen extends StatefulWidget {
-
   const ScannerScreen({super.key});
-
   @override
-
   State<ScannerScreen> createState() => _ScannerScreenState();
-
 }
 
-
-
-class _ScannerScreenState extends State<ScannerScreen>  {
-
+class _ScannerScreenState extends State<ScannerScreen> {
   CameraController? _controller;
-
   final AIScannerService _aiService = AIScannerService();
+  bool _isCameraReady  = false;
+  bool _isProcessing   = false;
+  bool _isFlashOn      = false;
 
-  bool _isCameraReady = false;
+  final GlobalKey<RecordsScreenState> _recordsKey =
+      GlobalKey<RecordsScreenState>();
 
-  bool _isProcessing = false;
-
-  bool _isFlashOn = false;
-
-
-  final GlobalKey<RecordsScreenState> _recordsKey = GlobalKey<RecordsScreenState>();
-
-
-  // Color palette
-
-  static const Color _neonCyan = Color(0xFF00E5FF);
-
-  static const Color _brightBlue = Color(0xFF4ABFDD);
-
-  static const Color _darkBg = Color(0xFF0D1B2A);
-
-  static const Color _lightBg = Color(0xFFF5F5F5);
-
-  static const Color _darkSurface = Color(0xFF1A2332);
-
-  static const Color _lightSurface = Color(0xFFFFFFFF);
-
-
+  // ── Paleta oficial de marca ───────────────────────────────────
+  static const Color _purple      = Color(0xFF462677); // morado primario
+  static const Color _purpleMid   = Color(0xFF6C559F); // morado medio
+  static const Color _cyan        = Color(0xFFB2DFEF); // cyan claro
+  static const Color _cyanMid     = Color(0xFF4ABFDD); // cyan medio
+  static const Color _cyanDark    = Color(0xFF00ABD6); // cyan oscuro
+  static const Color _green       = Color(0xFFA5C857); // verde
+  static const Color _red         = Color(0xFFE32344); // rojo
+  static const Color _darkBg      = Color(0xFF1A0F2E); // fondo oscuro morado
+  static const Color _darkSurface = Color(0xFF2A1A4A); // superficie morada
+  // ─────────────────────────────────────────────────────────────
 
   @override
-
   void initState() {
-
     super.initState();
     _initializeCamera();
-
   }
 
-
-
   Future<void> _initializeCamera() async {
-
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) return;
-      
-      final backCamera = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.back);
-      
-      // Asegurémonos de cerrar cualquier controlador previo antes de crear uno nuevo
-      if (_controller != null) {
-        await _controller!.dispose();
-      }
-
+      final backCamera = cameras.firstWhere(
+          (c) => c.lensDirection == CameraLensDirection.back);
+      if (_controller != null) await _controller!.dispose();
       _controller = CameraController(
-        backCamera, 
-        ResolutionPreset.medium, 
+        backCamera,
+        ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420, // Agregado para compatibilidad Android
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
-
       await _controller!.initialize();
-      
-      if (mounted) {
-        setState(() => _isCameraReady = true);
-      }
+      if (mounted) setState(() => _isCameraReady = true);
     } catch (e) {
       print("Error inicializando cámara: $e");
     }
-
   }
-
- 
 
   Future<String> _getDetailedAddress() async {
-
-  try {
-
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnabled) return "GPS Desactivado";
-
-
-
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-
-      permission = await Geolocator.requestPermission();
-
-      if (permission == LocationPermission.denied) return "Permiso denegado";
-
-    }
-
-
-
-    Position? position;
-
     try {
-
-      // Intentamos obtener la posición con un poco más de margen
-
-      position = await Geolocator.getCurrentPosition(
-
-        desiredAccuracy: LocationAccuracy.high,
-
-        timeLimit: const Duration(seconds: 5), // Aumentado a 5s para mayor precisión
-
-      );
-
-    } catch (_) {
-
-      position = await Geolocator.getLastKnownPosition();
-
-    }
-
-
-
-    if (position == null) return "Ubicación no disponible";
-
-
-
-    // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
-
-    List<Placemark> placemarks = [];
-
-    try {
-
-      // Aumentamos el timeout a 5 segundos. La geocodificación a veces es lenta.
-
-      placemarks = await placemarkFromCoordinates(
-
-        position.latitude,
-
-        position.longitude,
-
-      ).timeout(const Duration(seconds: 5));
-
-    } catch (e) {
-
-      print("Error en Geocoding: $e");
-
-      // Si falla la conversión, NO retornamos coordenadas, retornamos un texto descriptivo
-
-      return "Buscando nombre de calle...";
-
-    }
-
-
-
-    if (placemarks.isNotEmpty) {
-
-      final place = placemarks.first;
-
-     
-
-      // Prioridad de campos para obtener la dirección más exacta
-
-      String street = place.thoroughfare ?? ""; // Calle
-
-      String number = place.subThoroughfare ?? ""; // Número de casa
-
-      String locality = place.locality ?? ""; // Ciudad/Zona
-
-     
-
-      // Si la calle es "Unnamed road" o está vacía, usamos el nombre del lugar
-
-      if (street.isEmpty || street.toLowerCase().contains("unnamed")) {
-
-        street = place.name ?? "Calle desconocida";
-
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return "GPS Desactivado";
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return "Permiso denegado";
       }
-
-
-
-      // Construimos una dirección legible: "Calle Falsa 123, Cochabamba"
-
-      final String fullAddress = [
-
-        street,
-
-        number,
-
-        locality
-
-      ].where((s) => s.isNotEmpty).join(' ');
-
-
-
-      return fullAddress.isNotEmpty ? fullAddress : "Dirección no identificada";
-
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 5),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+      if (position == null) return "Ubicación no disponible";
+      List<Placemark> placemarks = [];
+      try {
+        placemarks = await placemarkFromCoordinates(
+                position.latitude, position.longitude)
+            .timeout(const Duration(seconds: 5));
+      } catch (e) {
+        return "Buscando nombre de calle...";
+      }
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        String street = place.thoroughfare ?? "";
+        String number = place.subThoroughfare ?? "";
+        String locality = place.locality ?? "";
+        if (street.isEmpty || street.toLowerCase().contains("unnamed")) {
+          street = place.name ?? "Calle desconocida";
+        }
+        final String fullAddress =
+            [street, number, locality].where((s) => s.isNotEmpty).join(' ');
+        return fullAddress.isNotEmpty ? fullAddress : "Dirección no identificada";
+      }
+      return "Área sin nombre registrado";
+    } catch (e) {
+      return "Error al obtener dirección";
     }
-
-
-
-    // NUNCA retornar coordenadas puras si lo que quieres son calles
-
-    return "Área sin nombre registrado";
-
-   
-
-  } catch (e) {
-
-    return "Error al obtener dirección";
-
   }
-
-}
-
-
 
   Future<void> _toggleFlash() async {
-
     if (!_isCameraReady) return;
-
     _isFlashOn = !_isFlashOn;
-
-    await _controller!.setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
-
+    await _controller!
+        .setFlashMode(_isFlashOn ? FlashMode.torch : FlashMode.off);
     setState(() {});
-
   }
-
-
 
   Future<void> _quickCapture() async {
     if (!_isCameraReady || _isProcessing) return;
     setState(() => _isProcessing = true);
-
     final List<String> photoPaths = [];
-
     try {
-      // ── PASO 1: 3 fotos rápidas ───────────────────────────────
       for (int i = 0; i < 3; i++) {
         final XFile photo = await _controller!.takePicture();
         photoPaths.add(photo.path);
       }
-
-      // ── PASO 2: OCR + GPS en paralelo ────────────────────────
       final results = await Future.wait([
         _aiService.processBestOfThree(photoPaths),
         _getPositionSafe(),
       ]);
-
       final PlateDetection? detection = results[0] as PlateDetection?;
       final Position position          = results[1] as Position;
-
-      // ── PASO 3: Limpiar archivos ──────────────────────────────
       for (final path in photoPaths) {
-        try { if (await File(path).exists()) await File(path).delete(); } catch (_) {}
+        try {
+          if (await File(path).exists()) await File(path).delete();
+        } catch (_) {}
       }
-
-      // ── Sin detección ─────────────────────────────────────────
       if (detection == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('❌ NO SE DETECTÓ PLACA. REINTENTE',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: _red,
               duration: const Duration(seconds: 2),
             ),
           );
         }
         return;
       }
-
-      // ── PASO 4: Dirección legible ─────────────────────────────
       final String currentAddress = await _resolveAddress(position);
-
-      // ── PASO 5: Navegar ───────────────────────────────────────
       if (!mounted) return;
       final resultData = await Navigator.push<Map<String, String>>(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationScreen(
             plate:       detection.plate,
-            base64Image: detection.base64Image, // ← ya no necesita imagePath
+            base64Image: detection.base64Image,
             location:    currentAddress,
             latitude:    position.latitude.toString(),
             longitude:   position.longitude.toString(),
@@ -322,11 +165,9 @@ class _ScannerScreenState extends State<ScannerScreen>  {
           ),
         ),
       );
-
       if (resultData != null && mounted) {
         final plateText    = resultData['plate']    ?? detection.plate;
         final locationText = resultData['location'] ?? currentAddress;
-
         final PlateRecord newRecord = PlateRecord(
           id:         int.tryParse(resultData['id'] ?? '') ?? 0,
           placa:      plateText,
@@ -337,9 +178,7 @@ class _ScannerScreenState extends State<ScannerScreen>  {
           supervisor: 'SUPERVISOR 01',
           ubicacion:  locationText,
         );
-
         _recordsKey.currentState?.addNewRecord(newRecord);
-        
       }
     } catch (e) {
       print('Error en captura: $e');
@@ -351,11 +190,11 @@ class _ScannerScreenState extends State<ScannerScreen>  {
     }
   }
 
-  /// GPS con fallback rápido
   Future<Position> _getPositionSafe() async {
     try {
       final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied)
+        await Geolocator.requestPermission();
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 4),
@@ -372,125 +211,176 @@ class _ScannerScreenState extends State<ScannerScreen>  {
     }
   }
 
-  /// Convierte coordenadas a dirección legible
   Future<String> _resolveAddress(Position pos) async {
-    if (pos.latitude == 0 && pos.longitude == 0) return 'Ubicación no disponible';
+    if (pos.latitude == 0 && pos.longitude == 0)
+      return 'Ubicación no disponible';
     try {
-      final marks = await placemarkFromCoordinates(pos.latitude, pos.longitude)
-          .timeout(const Duration(seconds: 4));
+      final marks =
+          await placemarkFromCoordinates(pos.latitude, pos.longitude)
+              .timeout(const Duration(seconds: 4));
       if (marks.isEmpty) return 'Área sin nombre registrado';
       final p = marks.first;
       String street = p.thoroughfare ?? '';
       if (street.isEmpty || street.toLowerCase().contains('unnamed')) {
         street = p.name ?? 'Calle desconocida';
       }
-      final parts = [street, p.subThoroughfare ?? '', p.locality ?? '']
-          .where((s) => s.isNotEmpty);
-      return parts.join(' ').isNotEmpty ? parts.join(' ') : 'Dirección no identificada';
+      final parts =
+          [street, p.subThoroughfare ?? '', p.locality ?? '']
+              .where((s) => s.isNotEmpty);
+      return parts.join(' ').isNotEmpty
+          ? parts.join(' ')
+          : 'Dirección no identificada';
     } catch (_) {
       return 'Ubicación no disponible';
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────────────────────
+  // ── BUILD ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (!_isCameraReady || _controller == null || !_controller!.value.isInitialized) {
+    if (!_isCameraReady ||
+        _controller == null ||
+        !_controller!.value.isInitialized) {
       return Scaffold(
-        backgroundColor: isDark ? _darkBg : _lightBg,
-        body: const Center(
-          child: CircularProgressIndicator(color: _neonCyan),
+        backgroundColor: _darkBg,
+        body: Center(
+          child: CircularProgressIndicator(color: _cyanMid),
         ),
       );
     }
-
-    
-
     return Scaffold(
-      backgroundColor: isDark ? _darkBg : _lightBg,
-      body: _buildScannerTab(), 
+      backgroundColor: _darkBg,
+      body: _buildScannerTab(),
     );
   }
 
   Widget _buildScannerTab() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Stack(
       children: [
+        // ── Cámara ────────────────────────────────────────────
         Positioned.fill(child: CameraPreview(_controller!)),
-        Positioned.fill(child: Container(color: Colors.black.withOpacity(0.15))),
 
-        // Status bar
+        // ── Overlay oscuro con tinte morado ───────────────────
+        Positioned.fill(
+          child: Container(
+            color: _purple.withOpacity(0.18),
+          ),
+        ),
+
+        // ── Status bar ────────────────────────────────────────
         Positioned(
-          top: 16, left: 16, right: 16,
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 16,
+          right: 16,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _statusChip(
                 icon: _isFlashOn ? Icons.flash_on : Icons.flash_off,
                 label: _isFlashOn ? 'FLASH ON' : 'FLASH OFF',
-                color: _isFlashOn ? Colors.amber : Colors.white30,
+                color: _isFlashOn ? Colors.amber : Colors.white60,
               ),
               _statusChip(
                 label: _isProcessing ? 'PROCESANDO...' : 'LISTO',
-                color: _isProcessing ? Colors.yellowAccent : _neonCyan,
+                color: _isProcessing ? _green : _cyanMid,
               ),
             ],
           ),
         ),
 
-        // Marco de escaneo
+        // ── Marco de escaneo con paleta oficial ───────────────
         Center(
-          child: Container(
-            width: 320, height: 200,
-            decoration: BoxDecoration(
-              border: Border.all(color: _neonCyan, width: 3),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(color: _neonCyan.withOpacity(0.4), blurRadius: 20, spreadRadius: 2),
-                BoxShadow(color: _neonCyan.withOpacity(0.2), blurRadius: 40, spreadRadius: 8),
-              ],
-            ),
-            child: Stack(
-              children: [
-                _corner(top: 8,    left: 8,  borderTop: true,    borderLeft: true),
-                _corner(top: 8,    right: 8, borderTop: true,    borderRight: true),
-                _corner(bottom: 8, left: 8,  borderBottom: true, borderLeft: true),
-                _corner(bottom: 8, right: 8, borderBottom: true, borderRight: true),
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.crop_free, color: _neonCyan.withOpacity(0.6), size: 40),
-                      const SizedBox(height: 12),
-                      Text('POSITION PLATE HERE',
-                          style: GoogleFonts.poppins(
-                            color: _neonCyan, fontSize: 13,
-                            fontWeight: FontWeight.bold, letterSpacing: 1,
-                          )),
-                    ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 320,
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: _cyanMid, width: 2.5),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _cyanMid.withOpacity(0.45),
+                        blurRadius: 22,
+                        spreadRadius: 2),
+                    BoxShadow(
+                        color: _purple.withOpacity(0.3),
+                        blurRadius: 40,
+                        spreadRadius: 8),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    _corner(top: 8,    left: 8,  borderTop: true,    borderLeft: true),
+                    _corner(top: 8,    right: 8, borderTop: true,    borderRight: true),
+                    _corner(bottom: 8, left: 8,  borderBottom: true, borderLeft: true),
+                    _corner(bottom: 8, right: 8, borderBottom: true, borderRight: true),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.crop_free,
+                              color: _cyanMid.withOpacity(0.7), size: 38),
+                          const SizedBox(height: 10),
+                          Text(
+                            'POSITION PLATE HERE',
+                            style: GoogleFonts.poppins(
+                              color: _cyan,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Hint bajo el marco
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _darkBg.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: _cyanMid.withOpacity(0.3), width: 1),
+                ),
+                child: Text(
+                  'Centra la patente dentro del marco',
+                  style: GoogleFonts.poppins(
+                    color: _cyan,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
 
-        // Panel inferior
+        // ── Panel inferior ────────────────────────────────────
         Positioned(
           bottom: 0, left: 0, right: 0,
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? _darkSurface : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              // Gradiente morado oscuro → superficie
+              gradient: LinearGradient(
+                colors: [_darkBg, _darkSurface],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+              ),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(32)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 20, spreadRadius: 2, offset: const Offset(0, -2),
+                  color: _purple.withOpacity(0.5),
+                  blurRadius: 24,
+                  spreadRadius: 2,
+                  offset: const Offset(0, -4),
                 ),
               ],
             ),
@@ -499,48 +389,110 @@ class _ScannerScreenState extends State<ScannerScreen>  {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Handle
+                  Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(
+                      color: _cyanMid.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Botones de control
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildControlButton(icon: Icons.flash_on, onTap: _toggleFlash, isActive: _isFlashOn, isDark: isDark),
-                      _buildControlButton(icon: Icons.refresh,   onTap: _initializeCamera, isActive: false, isDark: isDark),
+                      _buildControlButton(
+                        icon: Icons.flash_on,
+                        label: 'Flash',
+                        onTap: _toggleFlash,
+                        isActive: _isFlashOn,
+                      ),
+                      _buildControlButton(
+                        icon: Icons.refresh_rounded,
+                        label: 'Reset',
+                        onTap: _initializeCamera,
+                        isActive: false,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+
+                  const SizedBox(height: 22),
+
+                  // Botón principal de captura
                   SizedBox(
-                    width: double.infinity, height: 62,
-                    child: FilledButton.icon(
-                      onPressed: _isProcessing ? null : _quickCapture,
-                      icon: _isProcessing
-                          ? const SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                strokeWidth: 2,
+                    width: double.infinity,
+                    height: 62,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: _isProcessing
+                            ? null
+                            : LinearGradient(
+                                colors: [_cyanDark, _cyanMid],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
                               ),
-                            )
-                          : const Icon(Icons.camera_alt, size: 24),
-                      label: Text(
-                        _isProcessing ? 'CAPTURANDO...' : 'Capture',
-                        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 1),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: _isProcessing
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: _cyanMid.withOpacity(0.45),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                        color: _isProcessing ? Colors.grey.shade700 : null,
                       ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _brightBlue,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
+                      child: ElevatedButton.icon(
+                        onPressed: _isProcessing ? null : _quickCapture,
+                        icon: _isProcessing
+                            ? const SizedBox(
+                                width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.camera_alt_rounded, size: 24),
+                        label: Text(
+                          _isProcessing ? 'CAPTURANDO...' : 'Capturar Patente',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                          disabledBackgroundColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextButton(
+
+                  const SizedBox(height: 14),
+
+                  // Entrada manual
+                  TextButton.icon(
                     onPressed: () {},
-                    child: Text('Manual Entry',
-                        style: GoogleFonts.poppins(
-                          color: isDark ? Colors.white70 : Colors.grey[600],
-                          fontSize: 13, fontWeight: FontWeight.w500,
-                        )),
+                    icon: Icon(Icons.keyboard_alt_outlined,
+                        color: _cyan.withOpacity(0.7), size: 16),
+                    label: Text(
+                      'Entrada manual',
+                      style: GoogleFonts.poppins(
+                        color: _cyan.withOpacity(0.7),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -551,62 +503,108 @@ class _ScannerScreenState extends State<ScannerScreen>  {
     );
   }
 
-  Widget _statusChip({IconData? icon, required String label, required Color color}) {
+  // ── Chip de estado ────────────────────────────────────────────
+  Widget _statusChip(
+      {IconData? icon, required String label, required Color color}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(20)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: _darkBg.withOpacity(0.75),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.35), width: 1),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, color: color, size: 16), const SizedBox(width: 6)],
-          Text(label, style: GoogleFonts.poppins(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 15),
+            const SizedBox(width: 5),
+          ],
+          Text(label,
+              style: GoogleFonts.poppins(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8)),
         ],
       ),
     );
   }
 
+  // ── Esquinas del marco ────────────────────────────────────────
   Positioned _corner({
     double? top, double? bottom, double? left, double? right,
-    bool borderTop = false, bool borderBottom = false,
-    bool borderLeft = false, bool borderRight = false,
+    bool borderTop    = false,
+    bool borderBottom = false,
+    bool borderLeft   = false,
+    bool borderRight  = false,
   }) {
     return Positioned(
       top: top, bottom: bottom, left: left, right: right,
       child: Container(
-        width: 24, height: 24,
+        width: 26, height: 26,
         decoration: BoxDecoration(
           border: Border(
-            top:    borderTop    ? BorderSide(color: _neonCyan, width: 3) : BorderSide.none,
-            bottom: borderBottom ? BorderSide(color: _neonCyan, width: 3) : BorderSide.none,
-            left:   borderLeft   ? BorderSide(color: _neonCyan, width: 3) : BorderSide.none,
-            right:  borderRight  ? BorderSide(color: _neonCyan, width: 3) : BorderSide.none,
+            top:    borderTop    ? BorderSide(color: _cyanMid, width: 3) : BorderSide.none,
+            bottom: borderBottom ? BorderSide(color: _cyanMid, width: 3) : BorderSide.none,
+            left:   borderLeft   ? BorderSide(color: _cyanMid, width: 3) : BorderSide.none,
+            right:  borderRight  ? BorderSide(color: _cyanMid, width: 3) : BorderSide.none,
           ),
         ),
       ),
     );
   }
 
+  // ── Botón de control (flash / reset) ─────────────────────────
   Widget _buildControlButton({
     required IconData icon,
+    required String label,
     required VoidCallback onTap,
     required bool isActive,
-    required bool isDark,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 72, height: 72,
-        decoration: BoxDecoration(
-          color: isActive ? _neonCyan : Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: isActive ? _neonCyan.withOpacity(0.4) : Colors.black.withOpacity(0.12),
-              blurRadius: 12, spreadRadius: 2,
+      child: Column(
+        children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? _cyanMid
+                  : _darkSurface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isActive
+                    ? _cyanMid
+                    : _cyanMid.withOpacity(0.25),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isActive
+                      ? _cyanMid.withOpacity(0.45)
+                      : _purple.withOpacity(0.3),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Icon(icon, color: isActive ? _darkBg : Colors.grey[800], size: 32),
+            child: Icon(
+              icon,
+              color: isActive ? _darkBg : _cyan,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: isActive ? _cyanMid : _cyan.withOpacity(0.6),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

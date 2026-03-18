@@ -30,17 +30,20 @@ class ConfirmationScreen extends StatefulWidget {
 }
 
 class _ConfirmationScreenState extends State<ConfirmationScreen> {
+  // ── Paleta oficial ────────────────────────────────────────────
+  static const Color _purple    = Color(0xFF462677);
+  static const Color _purpleMid = Color(0xFF6C559F);
+  static const Color _cyan      = Color(0xFFB2DFEF);
+  static const Color _cyanMid   = Color(0xFF4ABFDD);
+  static const Color _cyanDark  = Color(0xFF00ABD6);
+  static const Color _green     = Color(0xFFA5C857);
+  static const Color _red       = Color(0xFFE32344);
+  static const Color _bgGray    = Color(0xFFF8FAFF);
+  static const Color _white     = Colors.white;
+
   late TextEditingController _plateController;
   final ApiRepository _apiRepository = ApiRepository();
-  bool _isSaving = false;
-
-  static const Color _darkPurple = Color(0xFF311B92);
-  static const Color _successGreen = Color(0xFF8BC34A);
-  static const Color _lightGray = Color(0xFFF5F5F5);
-  static const Color _mediumGray = Color(0xFFE0E0E0);
-  static const Color _darkGray = Color(0xFF757575);
-  static const Color _white = Color(0xFFFFFFFF);
-
+  bool _isSaving  = false;
   bool _isEditing = false;
   late final Uint8List _imageBytes;
 
@@ -48,7 +51,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   void initState() {
     super.initState();
     _plateController = TextEditingController(text: widget.plate);
-    _imageBytes = base64Decode(widget.base64Image);
+    _imageBytes      = base64Decode(widget.base64Image);
   }
 
   @override
@@ -62,11 +65,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     return WillPopScope(
       onWillPop: () async => true,
       child: Scaffold(
-        backgroundColor: _lightGray,
+        backgroundColor: _bgGray,
         appBar: _buildAppBar(),
         body: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -78,7 +81,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
                 _buildPlateEditField(),
                 const SizedBox(height: 12),
                 _buildHelpText(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildLocationChip(),
                 const SizedBox(height: 32),
                 _buildActionButtons(context),
@@ -91,33 +94,59 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ── AppBar con gradiente morado ───────────────────────────────
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: _white,
-      elevation: 2,
+      elevation: 0,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_purple, Color(0xFF6B3FA0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+      ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: _darkPurple),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: Colors.white, size: 20),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Text(
-        'Confirmar Patente',
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: _darkPurple,
-        ),
+      title: Row(
+        children: [
+          Icon(Icons.fact_check_rounded, color: _cyan, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Confirmar Patente',
+            style: GoogleFonts.poppins(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
       centerTitle: false,
     );
   }
 
+  // ── Indicador de pasos ────────────────────────────────────────
   Widget _buildProgressIndicator() {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        padding:
+            const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         decoration: BoxDecoration(
-          color: _mediumGray,
+          color: _white,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _cyan.withOpacity(0.4), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: _purple.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            )
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -135,18 +164,28 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
 
   Widget _stepCircle(String label, {required bool filled}) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 34, height: 34,
       decoration: BoxDecoration(
-        color: filled ? _darkPurple : _mediumGray,
+        gradient: filled
+            ? const LinearGradient(
+                colors: [_purple, _purpleMid],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: filled ? null : _cyan.withOpacity(0.2),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: filled ? Colors.transparent : _cyan.withOpacity(0.5),
+          width: 1.5,
+        ),
       ),
       child: Center(
         child: Text(
           label,
           style: GoogleFonts.poppins(
-            color: filled ? _white : _darkGray,
-            fontWeight: FontWeight.w600,
+            color: filled ? _white : _purpleMid,
+            fontWeight: FontWeight.w700,
             fontSize: 14,
           ),
         ),
@@ -158,13 +197,23 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Container(
-        width: 40,
-        height: 2,
-        color: filled ? _darkPurple : _mediumGray,
+        width: 40, height: 3,
+        decoration: BoxDecoration(
+          gradient: filled
+              ? const LinearGradient(
+                  colors: [_purple, _cyanMid],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                )
+              : null,
+          color: filled ? null : _cyan.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(2),
+        ),
       ),
     );
   }
 
+  // ── Imagen capturada ──────────────────────────────────────────
   Widget _buildCapturedImage() {
     return Center(
       child: Container(
@@ -174,9 +223,9 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: _purple.withOpacity(0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -193,15 +242,23 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
             ),
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Container(color: Colors.black.withOpacity(0.15)),
+              child: Container(
+                  color: _purple.withOpacity(0.12)),
             ),
+            // Marco de patente con color cyan
             Center(
               child: Container(
-                width: 200,
-                height: 100,
+                width: 200, height: 100,
                 decoration: BoxDecoration(
-                  border: Border.all(color: _white, width: 2),
+                  border: Border.all(color: _cyanMid, width: 2.5),
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _cyanMid.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    )
+                  ],
                 ),
               ),
             ),
@@ -211,6 +268,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ── Campo editable de patente ─────────────────────────────────
   Widget _buildPlateEditField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,84 +279,135 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
             Text(
               'Número de patente',
               style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: _darkGray),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-              decoration: BoxDecoration(
-                color: _successGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _purpleMid,
               ),
-              child: Text(
-                'LECTURA EXITOSA',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _successGreen,
-                  letterSpacing: 0.5,
-                ),
+            ),
+            // Badge lectura exitosa con verde oficial
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  vertical: 4, horizontal: 12),
+              decoration: BoxDecoration(
+                color: _green.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _green.withOpacity(0.3), width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_outline_rounded,
+                      color: _green, size: 13),
+                  const SizedBox(width: 5),
+                  Text(
+                    'LECTURA EXITOSA',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF3D5A0D),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Material(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: _white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: _isEditing ? _darkPurple : _mediumGray, width: 2),
-              boxShadow: _isEditing
-                  ? [
-                      BoxShadow(
-                          color: _darkPurple.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2))
-                    ]
-                  : null,
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: _white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: _isEditing
+                  ? _cyanMid
+                  : _cyan.withOpacity(0.4),
+              width: _isEditing ? 2 : 1.5,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _plateController,
-                    onTap: () => setState(() => _isEditing = true),
-                    onSubmitted: (_) => setState(() => _isEditing = false),
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: _darkPurple,
-                      letterSpacing: 1.5,
+            boxShadow: _isEditing
+                ? [
+                    BoxShadow(
+                      color: _cyanMid.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    )
+                  ]
+                : [
+                    BoxShadow(
+                      color: _purple.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _plateController,
+                  onTap:      () => setState(() => _isEditing = true),
+                  onSubmitted: (_) => setState(() => _isEditing = false),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    color: _purple,
+                    letterSpacing: 2,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Patente',
+                    hintStyle: GoogleFonts.poppins(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: _cyan.withOpacity(0.5),
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Patente',
-                      hintStyle: GoogleFonts.poppins(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: _mediumGray),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => setState(() => _isEditing = !_isEditing),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                        color: _darkPurple.withOpacity(0.1),
-                        shape: BoxShape.circle),
-                    child:
-                        const Icon(Icons.edit, color: _darkPurple, size: 20),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => setState(() => _isEditing = !_isEditing),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _isEditing
+                        ? _cyanMid.withOpacity(0.15)
+                        : _purple.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isEditing ? Icons.check_rounded : Icons.edit_rounded,
+                    color: _isEditing ? _cyanDark : _purple,
+                    size: 20,
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Texto de ayuda ────────────────────────────────────────────
+  Widget _buildHelpText() {
+    return Row(
+      children: [
+        Icon(Icons.info_outline_rounded,
+            size: 14, color: _purpleMid.withOpacity(0.5)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            'Revise el texto. Puede editarlo si hubo un error en el escaneo.',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: _purpleMid.withOpacity(0.6),
+              height: 1.5,
             ),
           ),
         ),
@@ -306,50 +415,55 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
-  Widget _buildHelpText() {
-    return Text(
-      'Revise el texto. Puede editarlo si hubo un error en el escaneo.',
-      style: GoogleFonts.poppins(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          color: _darkGray,
-          height: 1.5),
-    );
-  }
-
+  // ── Chip de ubicación ─────────────────────────────────────────
   Widget _buildLocationChip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _mediumGray, width: 1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cyan.withOpacity(0.35), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: _purple.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 40, height: 40,
             decoration: BoxDecoration(
-                color: _darkPurple.withOpacity(0.1), shape: BoxShape.circle),
-            child:
-                const Icon(Icons.location_on, color: _darkPurple, size: 20),
+              color: _cyan.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(Icons.location_on_rounded,
+                color: _purple, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Ubicación detectada',
-                    style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: _darkGray)),
-                const SizedBox(height: 4),
-                Text(widget.location,
-                    style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _darkPurple)),
+                Text(
+                  'Ubicación detectada',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _purpleMid.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  widget.location,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _purple,
+                  ),
+                ),
               ],
             ),
           ),
@@ -358,92 +472,122 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     );
   }
 
+  // ── Botones de acción ─────────────────────────────────────────
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
+        // Confirmar — gradiente morado
         AbsorbPointer(
           absorbing: _isSaving,
           child: Opacity(
-            opacity: _isSaving ? 0.6 : 1.0,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _onConfirm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _darkPurple,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28)),
-                elevation: 4,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_isSaving)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
-                    )
-                  else
-                    const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(
-                    _isSaving ? 'Guardando...' : 'Confirmar Patente',
-                    style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
+            opacity: _isSaving ? 0.7 : 1.0,
+            child: SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_purple, _purpleMid],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _purple.withOpacity(0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _onConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:         Colors.transparent,
+                    shadowColor:             Colors.transparent,
+                    disabledBackgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _isSaving
+                          ? const SizedBox(
+                              width: 22, height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 22),
+                      const SizedBox(width: 10),
+                      Text(
+                        _isSaving ? 'Guardando...' : 'Confirmar Patente',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
+
         const SizedBox(height: 12),
+
+        // Volver a escanear — borde cyan
         if (!_isSaving)
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: _darkPurple, width: 2),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28)),
-            ),
-            child: Text(
-              'Volver a Escanear',
-              style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _darkPurple),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _purple,
+                side: BorderSide(color: _cyan.withOpacity(0.7), width: 2),
+                backgroundColor: _cyan.withOpacity(0.06),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18)),
+              ),
+              icon: const Icon(Icons.camera_alt_rounded,
+                  color: _purple, size: 20),
+              label: Text(
+                'Volver a Escanear',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _purple,
+                ),
+              ),
             ),
           ),
       ],
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ CORREGIDO: guarda datos en SessionManager ANTES de navegar
-  // ─────────────────────────────────────────────────────────────
+  // ── Lógica intacta ────────────────────────────────────────────
   Future<void> _onConfirm() async {
     final placa = _plateController.text.trim().toUpperCase();
 
-    // Guardamos los datos de entrada en SessionManager para que
-    // VerificandoScreen los use y no los pierda
-    SessionManager.ultimaPlaca = placa;
-    SessionManager.ultimaLatitud = widget.latitude;
-    SessionManager.ultimaLongitud = widget.longitude;
+    SessionManager.ultimaPlaca     = placa;
+    SessionManager.ultimaLatitud   = widget.latitude;
+    SessionManager.ultimaLongitud  = widget.longitude;
 
-    // Navegar a VerificandoScreen con los datos necesarios
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => VerificandoScreen(
           data: {
-            "placa": placa,
+            "placa":       placa,
             "base64Image": widget.base64Image,
-            "ubicacion": widget.location,
-            "latitude": widget.latitude,
-            "longitude": widget.longitude,
+            "ubicacion":   widget.location,
+            "latitude":    widget.latitude,
+            "longitude":   widget.longitude,
           },
         ),
       ),

@@ -17,9 +17,18 @@ class ResultadoVerificacionScreen extends StatefulWidget {
 
 class _ResultadoVerificacionScreenState
     extends State<ResultadoVerificacionScreen> {
+  // ── Paleta oficial ────────────────────────────────────────────
+  static const Color _purple    = Color(0xFF462677);
+  static const Color _purpleMid = Color(0xFF6C559F);
+  static const Color _cyan      = Color(0xFFB2DFEF);
+  static const Color _cyanMid   = Color(0xFF4ABFDD);
+  static const Color _cyanDark  = Color(0xFF00ABD6);
+  static const Color _green     = Color(0xFFA5C857);
+  static const Color _red       = Color(0xFFE32344);
+  static const Color _bgGray    = Color(0xFFF8FAFF);
+
   bool _notificando = false;
 
-  // ✅ Leemos directamente desde SessionManager — siempre disponibles
   Map<String, dynamic> get _data     => SessionManager.ultimaVerificacion;
   Map<String, dynamic> get _registro => SessionManager.ultimoRegistro;
   String               get _estado   => SessionManager.ultimoEstado;
@@ -36,22 +45,27 @@ class _ResultadoVerificacionScreenState
     final bool noRegistrado = _estado == "No Registrado";
     final bool esInfraccion = pagoVencido || noRegistrado;
 
+    // ── Config visual por estado ──────────────────────────────
     Color    estadoColor;
     Color    estadoBg;
+    Color    estadoBorder;
     IconData estadoIcon;
 
     if (pagoVigente) {
-      estadoColor = Colors.green;
-      estadoBg    = const Color(0xFFE8F5E9);
-      estadoIcon  = Icons.check_circle;
+      estadoColor  = _green;
+      estadoBg     = _green.withOpacity(0.12);
+      estadoBorder = _green.withOpacity(0.3);
+      estadoIcon   = Icons.check_circle_rounded;
     } else if (pagoVencido) {
-      estadoColor = Colors.red;
-      estadoBg    = const Color(0xFFFFEBEE);
-      estadoIcon  = Icons.error_outline;
+      estadoColor  = _red;
+      estadoBg     = _red.withOpacity(0.10);
+      estadoBorder = _red.withOpacity(0.3);
+      estadoIcon   = Icons.gavel_rounded;
     } else {
-      estadoColor = Colors.orange;
-      estadoBg    = const Color(0xFFFFF3E0);
-      estadoIcon  = Icons.info_outline;
+      estadoColor  = Colors.orange;
+      estadoBg     = Colors.orange.withOpacity(0.10);
+      estadoBorder = Colors.orange.withOpacity(0.3);
+      estadoIcon   = Icons.warning_amber_rounded;
     }
 
     final horaConsulta =
@@ -59,93 +73,169 @@ class _ResultadoVerificacionScreenState
         "${TimeOfDay.now().minute.toString().padLeft(2, '0')} HS";
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const ScannerScreen()),
-            (route) => false,
+      backgroundColor: _bgGray,
+
+      // ── AppBar con gradiente morado ───────────────────────────
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_purple, Color(0xFF6B3FA0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                  size: 20, color: Colors.white),
+              onPressed: () => Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const ScannerScreen()),
+                (route) => false,
+              ),
+            ),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_rounded, color: _cyan, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  "VERIFICACIÓN",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        title: Text(
-          "VERIFICACIÓN",
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF2D2D5E),
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            letterSpacing: 1.2,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Color(0xFF2D2D5E)),
       ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Card patente + estado ──
+            // ── Card patente + estado ─────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                  vertical: 40, horizontal: 20),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(35),
+                gradient: const LinearGradient(
+                  colors: [_purple, Color(0xFF6B3FA0)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
+                    color: _purple.withOpacity(0.3),
                     blurRadius: 20,
-                    offset: const Offset(0, 10),
-                    color: const Color(0xFF4A2E8E).withOpacity(0.05),
+                    offset: const Offset(0, 8),
                   )
                 ],
               ),
-              child: Column(
+              child: Stack(
                 children: [
-                  Text(
-                    "PATENTE",
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.withOpacity(0.8),
-                      letterSpacing: 2,
+                  // Círculos decorativos
+                  Positioned(
+                    top: -20, right: -20,
+                    child: Container(
+                      width: 120, height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _cyanMid.withOpacity(0.1),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  // ✅ Usa SessionManager directamente
-                  Text(
-                    _placa.isNotEmpty ? _placa : "SIN DATOS",
-                    style: GoogleFonts.poppins(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1A1C24),
-                      letterSpacing: -1,
+                  Positioned(
+                    bottom: -15, left: -15,
+                    child: Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _cyan.withOpacity(0.08),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 25),
-                  Container(
+
+                  // Contenido
+                  Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: estadoBg,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                        vertical: 32, horizontal: 24),
+                    child: Column(
                       children: [
-                        Icon(estadoIcon, color: estadoColor, size: 22),
-                        const SizedBox(width: 10),
+                        // Label PATENTE
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _cyan.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: _cyan.withOpacity(0.3), width: 1),
+                          ),
+                          child: Text(
+                            "PATENTE",
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _cyan,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Número de placa
                         Text(
-                          _estado.isEmpty ? "No Registrado" : _estado,
+                          _placa.isNotEmpty ? _placa : "SIN DATOS",
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: estadoColor,
+                            fontSize: 52,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Badge estado
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: estadoBg,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: estadoBorder, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(estadoIcon,
+                                  color: estadoColor, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                _estado.isEmpty
+                                    ? "No Registrado"
+                                    : _estado,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: estadoColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -155,20 +245,38 @@ class _ResultadoVerificacionScreenState
               ),
             ),
 
-            const SizedBox(height: 35),
+            const SizedBox(height: 28),
 
-            Text(
-              "DETALLES DEL REGISTRO",
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.blueGrey.withOpacity(0.6),
-                letterSpacing: 0.5,
-              ),
+            // ── Sección label ─────────────────────────────────
+            Row(
+              children: [
+                Container(
+                  width: 4, height: 18,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_purple, _cyanMid],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "DETALLES DEL REGISTRO",
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _purple.withOpacity(0.6),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 15),
+            const SizedBox(height: 14),
 
+            // ── Tiles de detalle ──────────────────────────────
             _detailTile(
               Icons.calendar_today_outlined,
               "FECHA",
@@ -199,78 +307,101 @@ class _ResultadoVerificacionScreenState
                 parking["hour_end"].toString(),
               ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
 
-           // ── Botón Nueva verificación ──
-          ElevatedButton(
-            onPressed: () {
-              // Esto reinicia la app en el AppShell apuntando al Dashboard (Case 0)
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AppShell(initialIndex: 0)),
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2D2D5E),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 60),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+            // ── Botón volver al inicio ────────────────────────
+            SizedBox(
+              width: double.infinity,
+              height: 58,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_purple, _purpleMid],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _purple.withOpacity(0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    )
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              const AppShell(initialIndex: 0)),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor:     Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.home_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        "Volver al inicio",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.search, size: 20),
-                const SizedBox(width: 12),
-                Text(
-                  "Volver al inicio", // Cambiado para que sea coherente con el Dashboard
-                  style: GoogleFonts.poppins(
-                      fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // ── Botón Notificar infracción ──
+            // ── Botón notificar infracción ────────────────────
             if (esInfraccion)
               _notificando
-                  ? const Center(
+                  ? Center(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 20),
                         child: CircularProgressIndicator(
-                            color: Colors.red),
+                            color: _red),
                       ),
                     )
                   : SizedBox(
                       width: double.infinity,
-                      height: 60,
+                      height: 58,
                       child: OutlinedButton.icon(
-                        onPressed: _notificando ? null : () => _notificarInfraccion(context), 
+                        onPressed: _notificando
+                            ? null
+                            : () => _notificarInfraccion(context),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(
-                              color: Colors.red, width: 2),
+                          foregroundColor: _red,
+                          side: BorderSide(color: _red, width: 2),
+                          backgroundColor: _red.withOpacity(0.05),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(18),
                           ),
                         ),
-                        icon: const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.red,
-                          size: 24,
-                        ),
+                        icon: Icon(Icons.warning_amber_rounded,
+                            color: _red, size: 22),
                         label: Text(
                           "Notificar infracción",
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Colors.red,
+                            color: _red,
                           ),
                         ),
                       ),
@@ -283,43 +414,38 @@ class _ResultadoVerificacionScreenState
     );
   }
 
+  // ── Lógica intacta ────────────────────────────────────────────
   Future<void> _notificarInfraccion(BuildContext context) async {
     if (_notificando) return;
-
-    debugPrint("🔔 NOTIFICANDO — placa: $_placa | lat: $_lat | lon: $_lon");
-
+    debugPrint(
+        "🔔 NOTIFICANDO — placa: $_placa | lat: $_lat | lon: $_lon");
     if (_placa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Error: no se encontró la placa del vehículo"),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: Text(
+              "Error: no se encontró la placa del vehículo",
+              style: GoogleFonts.poppins()),
+          backgroundColor: _red,
         ),
       );
       return;
     }
-
     setState(() => _notificando = true);
-
     try {
       final token = SessionManager.semToken;
       if (token == null) throw Exception("No hay sesión activa");
-
       await NotificacionService.enviarNotificacion(
         token:     token,
         placa:     _placa,
         latitude:  _lat,
         longitude: _lon,
       );
-
       debugPrint("✅ Notificación enviada");
-
       if (!mounted) return;
-
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => const InfraccionRegistradaScreen(),
-          // ✅ Pasamos los datos como arguments Y están en SessionManager
           settings: RouteSettings(
             arguments: {
               "registro": {
@@ -336,8 +462,9 @@ class _ResultadoVerificacionScreenState
       setState(() => _notificando = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Error al notificar: $e"),
-          backgroundColor: Colors.red,
+          content: Text("Error al notificar: $e",
+              style: GoogleFonts.poppins()),
+          backgroundColor: _red,
           duration: const Duration(seconds: 6),
         ),
       );
@@ -358,27 +485,36 @@ class _ResultadoVerificacionScreenState
     }
   }
 
+  // ── Tile de detalle con paleta oficial ────────────────────────
   Widget _detailTile(IconData icon, String title, String value) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.grey.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cyan.withOpacity(0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: _purple.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Row(
         children: [
+          // Ícono con fondo cyan
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 42, height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F4FF),
+              color: _cyan.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon,
-                color: const Color(0xFF4DB6E1), size: 22),
+            child: Icon(icon, color: _purple, size: 20),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,18 +522,19 @@ class _ResultadoVerificacionScreenState
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey,
+                    color: _purpleMid.withOpacity(0.6),
                     letterSpacing: 0.5,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2D2D5E),
+                    color: _purple,
                   ),
                 ),
               ],

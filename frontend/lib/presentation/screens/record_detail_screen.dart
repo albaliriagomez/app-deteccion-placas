@@ -17,24 +17,25 @@ class RecordDetailScreen extends StatefulWidget {
 }
 
 class _RecordDetailScreenState extends State<RecordDetailScreen> {
-  // Colores
-  static const Color _darkPurple = Color(0xFF311B92);
-  static const Color _successGreen = Color(0xFF8BC34A);
-  static const Color _errorRed = Color(0xFFE57373);
-  static const Color _lightGray = Color(0xFFF5F5F5);
-  static const Color _mediumGray = Color(0xFFE0E0E0);
-  static const Color _darkGray = Color(0xFF757575);
-  static const Color _white = Color(0xFFFFFFFF);
+  // ── Paleta oficial ────────────────────────────────────────────
+  static const Color _purple    = Color(0xFF462677);
+  static const Color _purpleMid = Color(0xFF6C559F);
+  static const Color _cyan      = Color(0xFFB2DFEF);
+  static const Color _cyanMid   = Color(0xFF4ABFDD);
+  static const Color _cyanDark  = Color(0xFF00ABD6);
+  static const Color _green     = Color(0xFFA5C857);
+  static const Color _red       = Color(0xFFE32344);
+  static const Color _bgGray    = Color(0xFFF8FAFF);
+  static const Color _white     = Colors.white;
 
-  // NUEVAS VARIABLES PARA CARGA DINÁMICA
+  // ── Lógica intacta ────────────────────────────────────────────
   final ApiRepository _apiRepository = ApiRepository();
   String? _loadedImageData;
-  bool _isLoadingImage = false;
+  bool    _isLoadingImage = false;
 
   @override
   void initState() {
     super.initState();
-    // Si el objeto record viene sin imagen (porque optimizamos la lista), la pedimos
     if (widget.record.imagen.isEmpty) {
       _fetchFullImage();
     } else {
@@ -45,11 +46,12 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
   Future<void> _fetchFullImage() async {
     setState(() => _isLoadingImage = true);
     try {
-      final fullImage = await _apiRepository.getFullImage(widget.record.id);
+      final fullImage =
+          await _apiRepository.getFullImage(widget.record.id);
       if (mounted) {
         setState(() {
-          _loadedImageData = fullImage;
-          _isLoadingImage = false;
+          _loadedImageData  = fullImage;
+          _isLoadingImage   = false;
         });
       }
     } catch (e) {
@@ -57,29 +59,66 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     }
   }
 
+  // ── Estado del registro → config visual ──────────────────────
+  Map<String, dynamic> _getStatusConfig(String estado) {
+    switch (estado.trim()) {
+      case 'Pago Vigente':
+        return {
+          'color':  _green,
+          'bg':     _green.withOpacity(0.12),
+          'border': _green.withOpacity(0.3),
+          'icon':   Icons.check_circle_rounded,
+          'label':  'PAGO VIGENTE',
+        };
+      case 'Pago Vencido':
+        return {
+          'color':  _red,
+          'bg':     _red.withOpacity(0.10),
+          'border': _red.withOpacity(0.3),
+          'icon':   Icons.gavel_rounded,
+          'label':  'PAGO VENCIDO',
+        };
+      case 'No Registrado':
+        return {
+          'color':  Colors.orange,
+          'bg':     Colors.orange.withOpacity(0.10),
+          'border': Colors.orange.withOpacity(0.3),
+          'icon':   Icons.warning_amber_rounded,
+          'label':  'NO REGISTRADO',
+        };
+      default:
+        return {
+          'color':  _purpleMid,
+          'bg':     _purpleMid.withOpacity(0.10),
+          'border': _purpleMid.withOpacity(0.2),
+          'icon':   Icons.help_outline_rounded,
+          'label':  estado.toUpperCase(),
+        };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isValid = widget.record.estado == 'VÁLIDO';
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : _lightGray,
+      backgroundColor: isDark ? const Color(0xFF1A0F2E) : _bgGray,
       appBar: _buildAppBar(isDark),
       body: SingleChildScrollView(
         child: Column(
           children: [
             _buildImageSection(isDark),
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStatusBadge(isValid),
-                  const SizedBox(height: 24),
-                  _buildInfoCard(isDark, isValid),
-                  const SizedBox(height: 24),
+                  _buildStatusBadge(),
+                  const SizedBox(height: 20),
+                  _buildInfoCard(isDark),
+                  const SizedBox(height: 16),
                   _buildVerificationCard(isDark),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   _buildActionButtons(isDark),
                   const SizedBox(height: 20),
                 ],
@@ -91,24 +130,97 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     );
   }
 
-  // --- MÉTODOS DE UI ACTUALIZADOS ---
+  // ── AppBar con gradiente morado ───────────────────────────────
+  AppBar _buildAppBar(bool isDark) {
+    return AppBar(
+      elevation: 0,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_purple, Color(0xFF6B3FA0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: Colors.white, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.receipt_long_rounded, color: _cyan, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Detalles del Registro',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+      centerTitle: false,
+    );
+  }
+
+  // ── Sección imagen ────────────────────────────────────────────
+  Widget _buildImageSection(bool isDark) {
+    return Container(
+      width: double.infinity,
+      height: 280,
+      color: isDark ? const Color(0xFF2A1A4A) : _white,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildImageWidget(),
+          // Degradado superior
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: Container(
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    _purple.withOpacity(0.5),
+                    Colors.transparent
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Badges superiores
+          Positioned(
+            top: 14, left: 16, right: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildMiniBadge(widget.record.estado),
+                _buildZoneChip(widget.record.zona),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildImageWidget() {
-    // 1. Si está cargando desde el API
     if (_isLoadingImage) {
-      return const Center(
-        child: CircularProgressIndicator(color: _darkPurple),
+      return Center(
+        child: CircularProgressIndicator(color: _cyanMid),
       );
     }
 
     final imagePath = _loadedImageData ?? "";
-    
-    // 2. Si no hay imagen disponible después de la carga
-    if (imagePath.isEmpty) {
-      return _buildNoImage();
-    }
 
-    // 3. Lógica Base64
+    if (imagePath.isEmpty) return _buildNoImage();
+
     if (imagePath.startsWith('/9j/') || imagePath.length > 500) {
       try {
         String base64String = imagePath;
@@ -118,53 +230,72 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
         return Image.memory(
           base64Decode(base64String.trim()),
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildNoImage(),
+          errorBuilder: (_, __, ___) => _buildNoImage(),
         );
       } catch (e) {
         return _buildNoImage();
       }
-    } 
+    }
 
-    // 4. Si es una ruta de archivo local (para capturas recién hechas)
     if (imagePath.startsWith('/') || imagePath.contains(':/')) {
       return Image.file(
         File(imagePath),
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildNoImage(),
+        errorBuilder: (_, __, ___) => _buildNoImage(),
       );
     }
 
     return _buildNoImage();
   }
 
-  // El resto de tus métodos permanecen igual o con ajustes mínimos
-  Widget _buildImageSection(bool isDark) {
+  Widget _buildNoImage() {
     return Container(
-      width: double.infinity,
-      height: 300,
-      color: isDark ? const Color(0xFF2A2A2A) : _white,
-      child: Stack(
-        fit: StackFit.expand,
+      color: _cyan.withOpacity(0.15),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.image_not_supported_rounded,
+                size: 60, color: _purpleMid.withOpacity(0.4)),
+            const SizedBox(height: 8),
+            Text('Sin imagen disponible',
+                style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: _purpleMid.withOpacity(0.5))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge(String estado) {
+    final cfg = _getStatusConfig(estado);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: (cfg['color'] as Color).withOpacity(0.85),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: (cfg['color'] as Color).withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildImageWidget(),
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.4), Colors.transparent],
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildMiniBadge(widget.record.estado),
-                  _buildZoneChip(widget.record.zona),
-                ],
-              ),
+          Icon(cfg['icon'] as IconData,
+              color: Colors.white, size: 15),
+          const SizedBox(width: 6),
+          Text(
+            cfg['label'] as String,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
             ),
           ),
         ],
@@ -172,132 +303,181 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     );
   }
 
-  // Helpers pequeños para limpiar el código
-  Widget _buildMiniBadge(String estado) {
-    final isValido = estado == 'VÁLIDO';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isValido ? _successGreen : _errorRed,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(isValido ? Icons.check_circle : Icons.warning, color: _white, size: 18),
-          const SizedBox(width: 8),
-          Text(estado, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: _white)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildZoneChip(String zona) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.black.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: _cyan.withOpacity(0.3), width: 1),
       ),
-      child: Text(zona, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _white)),
-    );
-  }
-
-  // ... (Aquí van tus métodos _buildAppBar, _buildNoImage, _buildStatusBadge, 
-  // _buildInfoCard, _buildVerificationCard, _buildActionButtons y _formatDateTime 
-  // que ya tenías, no necesitan cambios mayores)
-  
-  // Nota: Asegúrate de mantener _buildNoImage() tal como lo tenías.
-  Widget _buildNoImage() {
-    return Container(
-      color: const Color(0xFFE0E0E0),
-      child: const Center(child: Icon(Icons.image_not_supported, size: 80, color: Color(0xFF757575))),
-    );
-  }
-
-  AppBar _buildAppBar(bool isDark) {
-    return AppBar(
-      backgroundColor: isDark ? const Color(0xFF2A2A2A) : _white,
-      elevation: 2,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: _darkPurple),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Text(
-        'Detalles del Registro',
+      child: Text(
+        zona,
         style: GoogleFonts.poppins(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: _darkPurple,
-          letterSpacing: 0.5,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
         ),
       ),
-      centerTitle: false,
     );
   }
 
-  Widget _buildStatusBadge(bool isValid) {
+  // ── Badge de estado central ───────────────────────────────────
+  Widget _buildStatusBadge() {
+    final cfg   = _getStatusConfig(widget.record.estado);
+    final color = cfg['color'] as Color;
+
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isValid ? _successGreen.withOpacity(0.15) : _errorRed.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
+          color: cfg['bg'] as Color,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: cfg['border'] as Color, width: 1.5),
         ),
-        child: Text(
-          isValid ? 'VERIFICACIÓN EXITOSA' : 'INFRACCIÓN DETECTADA',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isValid ? _successGreen : _errorRed,
-            letterSpacing: 0.5,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(cfg['icon'] as IconData,
+                color: color, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              cfg['label'] as String,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard(bool isDark, bool isValid) {
+  // ── Card de información principal ─────────────────────────────
+  Widget _buildInfoCard(bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2A2A) : _white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _mediumGray, width: 1),
+        color: isDark ? const Color(0xFF2A1A4A) : _white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: _cyan.withOpacity(isDark ? 0.2 : 0.35),
+            width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+            color: _purple.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Número de Patente', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: _darkGray)),
-          const SizedBox(height: 8),
-          Text(widget.record.placa, style: GoogleFonts.poppins(fontSize: 36, fontWeight: FontWeight.w700, color: _darkPurple, letterSpacing: 1.5)),
-          const SizedBox(height: 24),
-          const Divider(color: _mediumGray, height: 1),
-          const SizedBox(height: 24),
+          // Sección label
+          Row(
+            children: [
+              Container(
+                width: 4, height: 16,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_purple, _cyanMid],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Número de Patente',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _purpleMid.withOpacity(0.6),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Número de placa grande
+          Text(
+            widget.record.placa,
+            style: GoogleFonts.poppins(
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              color: _purple,
+              letterSpacing: 2,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+          Divider(
+              color: _cyan.withOpacity(0.3), height: 1, thickness: 1),
+          const SizedBox(height: 18),
+
+          // Fecha + Supervisor
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildInfoItem('Fecha y Hora', _formatDateTime(widget.record.fecha), isDark),
-              _buildInfoItem('Supervisor', widget.record.supervisor, isDark),
+              _buildInfoItem(
+                'Fecha y Hora',
+                _formatDateTime(widget.record.fecha),
+                isDark,
+              ),
+              _buildInfoItem(
+                'Supervisor',
+                widget.record.supervisor,
+                isDark,
+              ),
             ],
           ),
-          const SizedBox(height: 24),
-          Text('Ubicación', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _darkGray)),
-          const SizedBox(height: 6),
+
+          const SizedBox(height: 18),
+
+          // Ubicación
+          Text(
+            'Ubicación',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _purpleMid.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(color: _darkPurple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _cyan.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: _cyan.withOpacity(0.3), width: 1),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.location_on, color: _darkPurple, size: 16),
-                const SizedBox(width: 8),
-                Expanded(child: Text(widget.record.ubicacion, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: _darkPurple))),
+                Icon(Icons.location_on_rounded,
+                    color: _purple, size: 16),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.record.ubicacion,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _purple,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -310,35 +490,82 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: _darkGray)),
-        const SizedBox(height: 6),
-        Text(value, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? _white : Colors.black)),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: _purpleMid.withOpacity(0.5),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : _purple,
+          ),
+        ),
       ],
     );
   }
 
+  // ── Card de verificación ──────────────────────────────────────
   Widget _buildVerificationCard(bool isDark) {
+    final cfg   = _getStatusConfig(widget.record.estado);
+    final color = cfg['color'] as Color;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2A2A) : _white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _mediumGray, width: 1),
+        color: isDark ? const Color(0xFF2A1A4A) : _white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+            color: cfg['border'] as Color, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: _purple.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Row(
         children: [
           Container(
             width: 48, height: 48,
-            decoration: BoxDecoration(color: _successGreen.withOpacity(0.15), shape: BoxShape.circle),
-            child: const Icon(Icons.check_circle, color: _successGreen, size: 28),
+            decoration: BoxDecoration(
+              color: (cfg['bg'] as Color),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(cfg['icon'] as IconData,
+                color: color, size: 26),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Permiso Vigente', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? _white : Colors.black)),
-                Text('La patente tiene todos los permisos requeridos', style: GoogleFonts.poppins(fontSize: 11, color: _darkGray)),
+                Text(
+                  cfg['label'] as String,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  widget.record.estado == 'Pago Vigente'
+                      ? 'La patente tiene todos los permisos requeridos'
+                      : widget.record.estado == 'Pago Vencido'
+                          ? 'El pago de parqueo ha vencido'
+                          : 'No se encontró registro de pago',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: _purpleMid.withOpacity(0.6),
+                  ),
+                ),
               ],
             ),
           ),
@@ -347,36 +574,74 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     );
   }
 
+  // ── Botones de acción ─────────────────────────────────────────
   Widget _buildActionButtons(bool isDark) {
     return Column(
       children: [
-        _buildButton(Icons.print, 'Imprimir', _darkPurple, isDark ? const Color(0xFF3A3A3A) : _white, _darkPurple),
+        _buildButton(
+          icon:      Icons.print_rounded,
+          label:     'Imprimir',
+          textColor: _purple,
+          bgColor:   isDark ? const Color(0xFF2A1A4A) : _white,
+          iconColor: _purple,
+          isDark:    isDark,
+        ),
         const SizedBox(height: 12),
       ],
     );
   }
 
-  Widget _buildButton(IconData icon, String label, Color textColor, Color bgColor, Color iconColor) {
+  Widget _buildButton({
+    required IconData icon,
+    required String   label,
+    required Color    textColor,
+    required Color    bgColor,
+    required Color    iconColor,
+    required bool     isDark,
+  }) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: bgColor == _white || bgColor == const Color(0xFF3A3A3A) ? Border.all(color: _mediumGray) : null,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: _cyan.withOpacity(isDark ? 0.2 : 0.4),
+            width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: _purple.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {},
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: iconColor),
-                const SizedBox(width: 12),
-                Text(label, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: textColor)),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _cyan.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
               ],
             ),
           ),
@@ -385,12 +650,17 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     );
   }
 
+  // ── Lógica intacta ────────────────────────────────────────────
   String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final recordDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-    String dayLabel = recordDate == today ? 'Hoy' : '${recordDate.day}/${recordDate.month}/${recordDate.year}';
-    final timeStr = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final now        = DateTime.now();
+    final today      = DateTime(now.year, now.month, now.day);
+    final recordDate = DateTime(
+        dateTime.year, dateTime.month, dateTime.day);
+    String dayLabel  = recordDate == today
+        ? 'Hoy'
+        : '${recordDate.day}/${recordDate.month}/${recordDate.year}';
+    final timeStr =
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     return '$dayLabel • $timeStr';
   }
 }
