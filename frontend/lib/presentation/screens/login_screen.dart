@@ -35,6 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final url = Uri.parse('${EnvConfig.baseUrl}/api/login');
+      print("🌐 URL: $url");  // ← VER QUÉ URL ESTÁ USANDO
+      
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -42,18 +44,29 @@ class _LoginScreenState extends State<LoginScreen> {
           'username': _userController.text.trim(),
           'password': _passController.text,
         }),
-      );
-      if (response.statusCode == 200) {
+      ).timeout(const Duration(minutes: 1));  
+      
+      print("📡 STATUS: ${response.statusCode}");  // ← VER EL CÓDIGO
+      print("📡 BODY: ${response.body}");           // ← VER LA RESPUESTA
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        SessionManager.semToken = data['sem_token'];
-        SessionManager.username = data['username'];
-        SessionManager.role     = data['role'];
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/app');
+  
+        await SessionManager.guardarSesion(
+          token:    data['sem_token'],
+          user:     data['username'],
+          userRole: data['role'],
+          email:    _userController.text.trim().toLowerCase(),
+      );
+  
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/app');
       } else {
+        print("❌ LOGIN FALLÓ — status: ${response.statusCode}");
         _showError("Usuario o contraseña incorrectos");
       }
     } catch (e) {
+      print("🔥 EXCEPCIÓN: $e");  // ← VER SI ES TIMEOUT U OTRO ERROR
       _showError("Error de conexión con el servidor");
     } finally {
       if (mounted) setState(() => _isLoading = false);

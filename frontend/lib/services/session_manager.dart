@@ -1,18 +1,62 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 class SessionManager {
-  // ── Campos existentes ──
   static String? semToken;
   static String? username;
   static String? role;
+  static String? userEmail;
 
-  // ── Campos nuevos para verificación ──
   static Map<String, dynamic> ultimaVerificacion = {};
   static Map<String, dynamic> ultimoRegistro     = {};
-  static String ultimoEstado  = "";
-  static String ultimaPlaca   = "";
-  static String ultimaLatitud = "0.0";
+  static String ultimoEstado   = "";
+  static String ultimaPlaca    = "";
+  static String ultimaLatitud  = "0.0";
   static String ultimaLongitud = "0.0";
 
-  // ── Guardar resultado de verificación ──
+  // ── Guardar sesión en disco ──
+  static Future<void> guardarSesion({
+    required String token,
+    required String user,
+    required String userRole,
+    required String email,
+  }) async {
+    semToken  = token;
+    username  = user;
+    role      = userRole;
+    userEmail = email;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('sem_token',   token);
+    await prefs.setString('username',    user);
+    await prefs.setString('role',        userRole);
+    await prefs.setString('user_email',  email);
+  }
+
+  // ── Recuperar sesión al abrir app ──
+  static Future<bool> recuperarSesion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('sem_token');
+    if (token == null || token.isEmpty) return false;
+
+    semToken  = token;
+    username  = prefs.getString('username')   ?? "";
+    role      = prefs.getString('role')       ?? "";
+    userEmail = prefs.getString('user_email') ?? "";
+    return true;
+  }
+
+  // ── Cerrar sesión ──
+  static Future<void> limpiarSesion() async {
+    semToken  = null;
+    username  = null;
+    role      = null;
+    userEmail = null;
+    limpiarVerificacion();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
   static void guardarVerificacion({
     required Map<String, dynamic> verificacion,
     required String placa,
@@ -37,15 +81,6 @@ class SessionManager {
     ultimoRegistro["longitude"] = longitud;
   }
 
-  // ── Limpiar sesión completa ──
-  static void limpiarSesion() {
-    semToken  = null;
-    username  = null;
-    role      = null;
-    limpiarVerificacion();
-  }
-
-  // ── Limpiar solo datos de verificación ──
   static void limpiarVerificacion() {
     ultimaVerificacion = {};
     ultimoRegistro     = {};
