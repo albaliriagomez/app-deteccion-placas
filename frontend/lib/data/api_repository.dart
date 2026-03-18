@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config/env_config.dart';
+import '../services/session_manager.dart';
 
 // Modelo de datos para registros de patentes
 class PlateRecord {
@@ -130,23 +131,23 @@ Future<String?> getFullImage(int id) async {
 
  Future<List<PlateRecord>> getPlateRecords() async {
   try {
-    final url = Uri.parse('$_baseUrl/api/registros');
-    print("📡 Descargando datos pesados desde: $url");
+    final email = SessionManager.userEmail ?? "";
+    final url = Uri.parse('$_baseUrl/api/registros')
+        .replace(queryParameters: {"usuario_email": email}); // ← CAMBIO
+    print("📡 Descargando datos desde: $url");
 
     final response = await http.get(
       url,
       headers: {
         "Content-Type": "application/json",
-        "Accept-Encoding": "gzip", // Esto ayuda a que el servidor comprima los datos
+        "Accept-Encoding": "gzip",
       },
-    ).timeout(const Duration(seconds: 60)); // <--- PONLE 1 MINUTO COMPLETO
+    ).timeout(const Duration(seconds: 60));
 
     if (response.statusCode == 200) {
-      // Usamos un decoder más eficiente para strings largos
       final String responseBody = utf8.decode(response.bodyBytes);
       final List<dynamic> data = jsonDecode(responseBody);
-      
-      print("✅ ¡Recibido! Procesando ${data.length} registros...");
+      print("✅ Procesando ${data.length} registros...");
       return data.map((json) => PlateRecord.fromJson(json)).toList();
     } else {
       return [];
@@ -155,11 +156,14 @@ Future<String?> getFullImage(int id) async {
     print("❌ Error: $e");
     rethrow;
   }
-  }
-  Future<Map<String, dynamic>> getDashboardStats() async {
+}
+
+Future<Map<String, dynamic>> getDashboardStats() async {
   try {
+    final email = SessionManager.userEmail ?? "";
     final response = await http.get(
-      Uri.parse('$_baseUrl/api/dashboard'),
+      Uri.parse('$_baseUrl/api/dashboard')
+          .replace(queryParameters: {"usuario_email": email}), // ← CAMBIO
       headers: {"Content-Type": "application/json"},
     ).timeout(const Duration(seconds: 30));
 

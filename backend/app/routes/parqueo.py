@@ -4,7 +4,6 @@ from datetime import datetime, date
 import requests
 import urllib3
 import traceback
-import json
 from .. import sem_session
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -29,12 +28,10 @@ def sem_login():
 
 @router.post("/verificar-parqueo")
 async def verificar_parqueo(data: dict, authorization: str = Header(None)):
-    # 📝 LOG DE ENTRADA
     print("\n" + "="*50)
-    print(f"📥 NUEVA PETICIÓN RECIBIDA: {datetime.now().strftime('%H:%M:%S')}")
-    
+    print(f"📥 NUEVA PETICIÓN: {datetime.now().strftime('%H:%M:%S')}")
+
     if not authorization:
-        print("❌ ERROR: Petición sin Header de Authorization")
         raise HTTPException(status_code=401, detail="Token requerido")
 
     placa     = data.get("placa", "").strip().upper()
@@ -44,78 +41,92 @@ async def verificar_parqueo(data: dict, authorization: str = Header(None)):
     imagen    = data.get("base64Image", "")
 
     if not placa:
-        print("❌ ERROR: Placa vacía en el body")
         raise HTTPException(status_code=400, detail="Placa requerida")
 
-    print(f"🚗 PROCESANDO PLACA: [{placa}]")
-    print(f"📍 UBICACIÓN: {ubicacion} ({lat}, {lon})")
+    print(f"🚗 PLACA: [{placa}]")
 
-    detection_datetime = datetime.now()
-    parking_info       = None
-    estado             = "No Registrado"
+    parking_info = None
+    estado       = "No Registrado"
 
     try:
-        # ── 1. Consultar SEM ──
-        print(f"📡 Consultando SEM para placa {placa}...")
-        sem_response = requests.get(
-            SEM_PARKING_URL,
-            params={"placa": placa},
-            headers={"Authorization": sem_session.SEM_ACTIVE_TOKEN},
-            timeout=10,
-            verify=False
-        )
+        # ── 1. Asegurar token SEM ──
+        if not sem_session.SEM_ACTIVE_TOKEN:
+            print("⚠️ Sin token SEM, haciendo login...")
+            sem_login()
 
-        if sem_response.status_code == 401:
-            print("🔑 Token SEM expirado. Renovando...")
-            new_token = sem_login()
-            sem_response = requests.get(
+        # ── 2. Consultar SEM ──
+        def _consultar(token):
+            return requests.get(
                 SEM_PARKING_URL,
                 params={"placa": placa},
-                headers={"Authorization": new_token},
+                headers={"Authorization": token},
                 timeout=10,
                 verify=False
             )
 
-        if sem_response.status_code != 200:
-            print(f"⚠️ SEM respondió error {sem_response.status_code}: {sem_response.text}")
-            # Si el SEM falla, seguimos pero como No Registrado
-        else:
+        sem_response = _consultar(sem_session.SEM_ACTIVE_TOKEN)
+        print(f"📡 SEM status: {sem_response.status_code}")
+        print(f"📡 SEM body:   {sem_response.text[:300]}")
+
+        if sem_response.status_code == 401:
+            print("🔑 Token expirado, renovando...")
+            sem_response = _consultar(sem_login())
+            print(f"📡 SEM retry: {sem_response.status_code} | {sem_response.text[:300]}")
+
+        # ── 3. Determinar estado desde respuesta SEM ──
+        if sem_response.status_code == 200:
             sem_data = sem_response.json()
-            
-            # ── 2. Determinar estado ──
-            if sem_data.get("ok") and sem_data.get("parking") is not None:
-                parking = sem_data["parking"]
-                parking_info = parking
-                hour_start = parking.get("hour_start")
-                hour_end   = parking.get("hour_end")
+            print(f"✅ SEM JSON: {sem_data}")
 
-                if hour_start and hour_end:
-                    fmt = "%H:%M:%S"
-                    today = date.today()
-                    try:
-                        start_dt = datetime.combine(today, datetime.strptime(hour_start, fmt).time())
-                        end_dt   = datetime.combine(today, datetime.strptime(hour_end,   fmt).time())
+            if sem_data.get("ok"):
+                # El SEM puede devolver "estado" directamente
+                sem_estado = sem_data.get("estado")
 
-                        if start_dt <= detection_datetime <= end_dt:
-                            estado = "Pago Vigente"
-                        else:
-                            estado = "Pago Vencido"
-                    except Exception as e:
-                        print(f"❌ Error formateando horas SEM: {e}")
+                if sem_estado:
+                    # El SEM ya calculó el estado — confiamos en él
+                    if sem_estado == "Pago Vigente":
+                        estado = "Pago Vigente"
+                    elif sem_estado in ("Pago Vencido", "Vencido"):
                         estado = "Pago Vencido"
+                    else:
+                        estado = "No Registrado"
+                    parking_info = sem_data.get("parking")
+
+                elif sem_data.get("parking") is not None:
+                    # Fallback: si viene el objeto parking con horas, calculamos nosotros
+                    parking      = sem_data["parking"]
+                    parking_info = parking
+                    hour_start   = parking.get("hour_start")
+                    hour_end     = parking.get("hour_end")
+
+                    if hour_start and hour_end:
+                        fmt   = "%H:%M:%S"
+                        today = date.today()
+                        now   = datetime.now()
+                        try:
+                            start_dt = datetime.combine(today, datetime.strptime(hour_start, fmt).time())
+                            end_dt   = datetime.combine(today, datetime.strptime(hour_end,   fmt).time())
+                            estado   = "Pago Vigente" if start_dt <= now <= end_dt else "Pago Vencido"
+                        except Exception as e:
+                            print(f"❌ Error parseando horas: {e}")
+                            estado = "Pago Vencido"
+                    else:
+                        estado = "Pago Vencido"
+
                 else:
-                    estado = "Pago Vencido"
+                    # ok=true pero sin estado ni parking → No Registrado
+                    estado = "No Registrado"
             else:
                 estado = "No Registrado"
+        else:
+            print(f"⚠️ SEM error {sem_response.status_code}")
+            # Dejamos estado = "No Registrado"
 
-        print(f"⚖️ RESULTADO LÓGICA: {estado}")
+        print(f"⚖️ ESTADO FINAL: {estado}")
 
-        # ── 3. Guardar en Base de Datos ──
-        print("💾 Guardando registro en DB local...")
+        # ── 4. Guardar en DB ──
         conn   = get_db_connection()
         cursor = conn.cursor()
-        
-        # Nota: Usamos imagen[:50] en el log para no llenar la consola de texto base64
         cursor.execute(
             """
             INSERT INTO placas (placa, ubicacion, latitude, longitude, imagen_path, estado, fecha)
@@ -127,14 +138,11 @@ async def verificar_parqueo(data: dict, authorization: str = Header(None)):
         nuevo = cursor.fetchone()
         conn.commit()
         conn.close()
-
-        # Formatear fecha para JSON
         nuevo["fecha"] = nuevo["fecha"].isoformat() if nuevo["fecha"] else None
 
-        print(f"✅ REGISTRO CREADO EXITOSAMENTE. ID: {nuevo['id']}")
+        print(f"✅ GUARDADO ID: {nuevo['id']}")
         print("="*50 + "\n")
 
-        # ✅ Respuesta completa para Flutter
         return {
             "success":   True,
             "estado":    estado,
@@ -142,12 +150,12 @@ async def verificar_parqueo(data: dict, authorization: str = Header(None)):
             "latitude":  lat,
             "longitude": lon,
             "ubicacion": ubicacion,
-            "registro":  nuevo, 
+            "registro":  nuevo,
             "parking":   parking_info,
         }
 
     except Exception as e:
-        print(f"🔥 ERROR CRÍTICO: {e}")
+        print(f"🔥 ERROR: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     
