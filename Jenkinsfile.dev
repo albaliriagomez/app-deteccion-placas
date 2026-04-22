@@ -41,8 +41,12 @@ pipeline {
             steps {
                 echo "✅ Verificando que el contenedor está corriendo..."
                 sh """
-                    sleep 5
-                    docker ps | grep ${CONTAINER_NAME}
+                    sleep 35
+                    echo "=== LOGS DEL CONTENEDOR ==="
+                    docker logs ${CONTAINER_NAME} || true
+                    echo "=== ESTADO ==="
+                    docker inspect --format='{{.State.Status}}' ${CONTAINER_NAME}
+                    docker inspect --format='{{.State.Status}}' ${CONTAINER_NAME} | grep -w running
                 """
             }
         }
