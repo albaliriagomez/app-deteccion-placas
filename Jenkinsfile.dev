@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    environment {
+        LABEL_SERVER  = "server_104.64"
+        COMPOSE_FILE  = "docker-compose-dev.yml"
+        CONTAINER_NAME = "lpr-backend-api"
+    }
+
+    stages {
+
+        stage('📥 Clonar repositorio') {
+            steps {
+                echo "✅ Código clonado correctamente por Jenkins"
+                sh 'ls -la'
+            }
+        }
+
+        stage('🛑 Detener contenedor anterior') {
+            steps {
+                echo "🛑 Deteniendo contenedor anterior si existe..."
+                sh "docker compose -f ${COMPOSE_FILE} down --remove-orphans || true"
+            }
+        }
+
+        stage('🔨 Construir imagen Docker') {
+            steps {
+                echo "🔨 Construyendo imagen del backend..."
+                sh "docker compose -f ${COMPOSE_FILE} build --no-cache"
+            }
+        }
+
+        stage('🚀 Levantar contenedor') {
+            steps {
+                echo "🚀 Levantando contenedor en puerto 8009..."
+                sh "docker compose -f ${COMPOSE_FILE} up -d"
+            }
+        }
+
+        stage('✅ Verificar contenedor') {
+            steps {
+                echo "✅ Verificando que el contenedor está corriendo..."
+                sh """
+                    sleep 5
+                    docker ps | grep ${CONTAINER_NAME}
+                """
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo "🎉 Deploy exitoso en servidor 192.168.104.64:8009"
+        }
+        failure {
+            sh "docker logs ${CONTAINER_NAME} || true"
+            echo "❌ El deploy falló. Revisa los logs arriba."
+        }
+    }
+}
