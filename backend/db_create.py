@@ -1,20 +1,19 @@
 import psycopg2
 import os
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
-
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
-DB_NAME = os.getenv("DB_NAME")
 
 def init_system():
-    conn = None
+    # Leer vars DENTRO de la función, no al importar
+    DB_USER = os.getenv("DB_USER")
+    DB_PASS = os.getenv("DB_PASS")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT", "5432")
+    DB_NAME = os.getenv("DB_NAME")
 
-    for i in range(5):
+    print(f"🔧 Conectando a PostgreSQL en {DB_HOST}:{DB_PORT} / DB: {DB_NAME} / User: {DB_USER}")
+
+    conn = None
+    for i in range(10):
         try:
             conn = psycopg2.connect(
                 dbname=DB_NAME,
@@ -26,12 +25,11 @@ def init_system():
             print("✅ Conexión a la base de datos exitosa.")
             break
         except Exception as e:
-            print(f"🔄 Esperando DB... ({i+1}/5): {e}")
-            time.sleep(2)
+            print(f"🔄 Esperando DB... ({i+1}/10): {e}")
+            time.sleep(3)
 
     if not conn:
-        print("❌ No se pudo conectar a PostgreSQL después de 5 intentos.")
-        return
+        raise Exception("❌ No se pudo conectar a PostgreSQL. Verifica DB_HOST, DB_NAME, DB_USER, DB_PASS en .env.dev")
 
     try:
         cursor = conn.cursor()
@@ -59,10 +57,10 @@ def init_system():
         print("✅ Tabla 'placas' lista.")
 
     except Exception as e:
-        print(f"❌ Error al crear tablas: {e}")
+        conn.rollback()
+        raise Exception(f"❌ Error al crear tablas: {e}")
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 if __name__ == "__main__":
     init_system()
