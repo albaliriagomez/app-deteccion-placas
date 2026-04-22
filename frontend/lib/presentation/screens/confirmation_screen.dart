@@ -578,6 +578,23 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     SessionManager.ultimaLatitud   = widget.latitude;
     SessionManager.ultimaLongitud  = widget.longitude;
 
+    // ✅ NUEVO: Verificar sesión antes de proceder
+    bool sesionVigente = await SessionManager.sesionVigente();
+    if (!sesionVigente) {
+      if (mounted) {
+        // Ir al login elegantemente
+        await Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+          (route) => false,
+          arguments: {'sessionExpired': true}
+        );
+      }
+      return;
+    }
+
+    // El resto del código sigue igual
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -592,5 +609,5 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
         ),
       ),
     );
-  }
+}
 }

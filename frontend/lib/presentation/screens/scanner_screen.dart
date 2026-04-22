@@ -9,6 +9,7 @@ import '../../core/services/ai_scanner_service.dart';
 import 'confirmation_screen.dart';
 import '../../data/api_repository.dart';
 import 'records_screen.dart';
+import '../../services/session_manager.dart';
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -118,6 +119,21 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
   Future<void> _quickCapture() async {
+
+    bool sigueVigente = await SessionManager.sesionVigente();
+    if (!sigueVigente) {
+        if (mounted) {
+            await Navigator.pushNamedAndRemoveUntil(
+                context, 
+                '/login', 
+                (route) => false,
+                arguments: {'sessionExpired': true}
+            );
+        }
+        return;
+    }
+
+
     if (!_isCameraReady || _isProcessing) return;
     setState(() => _isProcessing = true);
     final List<String> photoPaths = [];
