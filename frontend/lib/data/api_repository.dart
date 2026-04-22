@@ -79,8 +79,11 @@ class ApiRepository {
       print("📤 Enviando datos al servidor...");
 
       final response = await http.post(
-        Uri.parse("$_baseUrl/api/registros"),
-        headers: {"Content-Type": "application/json"},
+        Uri.parse("$_baseUrl/api/verificar-parqueo"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "${SessionManager.semToken}", // Sin espacios extra
+        },
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 15));
       

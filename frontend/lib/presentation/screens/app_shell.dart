@@ -31,6 +31,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _index = widget.initialIndex;
+    _verificarSesion(); 
   }
 
   void _goTo(int index) {
@@ -38,11 +39,26 @@ class _AppShellState extends State<AppShell> {
     setState(() => _index = index);
   }
 
-  void _logout() {
+  void _logout() async {
     SessionManager.semToken = null;
     SessionManager.username = null;
     SessionManager.role     = null;
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+
+    await SessionManager.limpiarSesion();   // limpia disco también
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+
+  Future<void> _verificarSesion() async {
+    final vigente = await SessionManager.sesionVigente();
+    if (!vigente && mounted) {
+      // Limpiar datos antes de redirigir
+      await SessionManager.limpiarSesion();
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false,
+          arguments: {'sessionExpired': true});
+    }
   }
 
   Widget _pageForIndex(int i) {

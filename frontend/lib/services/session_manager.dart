@@ -13,7 +13,10 @@ class SessionManager {
   static String ultimaLatitud  = "0.0";
   static String ultimaLongitud = "0.0";
 
-  // ── Guardar sesión en disco ──
+  // ── Duración de sesión: 8 horas ──────────────────────────────
+  static const int _sessionHours = 8;
+
+  // ── Guardar sesión en disco con timestamp ────────────────────
   static Future<void> guardarSesion({
     required String token,
     required String user,
@@ -26,26 +29,73 @@ class SessionManager {
     userEmail = email;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sem_token',   token);
-    await prefs.setString('username',    user);
-    await prefs.setString('role',        userRole);
-    await prefs.setString('user_email',  email);
+    await prefs.setString('sem_token',    token);
+    await prefs.setString('username',     user);
+    await prefs.setString('role',         userRole);
+    await prefs.setString('user_email',   email);
+    // 🕐 Guardar el momento exacto en que se hizo login
+    await prefs.setString('login_time',   DateTime.now().toIso8601String());
   }
 
-  // ── Recuperar sesión al abrir app ──
-  static Future<bool> recuperarSesion() async {
+  // ── Recuperar sesión al abrir app ────────────────────────────
+  // Devuelve: 'ok' | 'expired' | 'none'
+  static Future<String> recuperarSesionConEstado() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('sem_token');
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) return 'none';
+
+    // Verificar si ya pasaron 8 horas
+    final loginTimeStr = prefs.getString('login_time');
+    if (loginTimeStr != null) {
+      final loginTime = DateTime.tryParse(loginTimeStr);
+      if (loginTime != null) {
+        final ahora      = DateTime.now();
+        final diferencia = ahora.difference(loginTime);
+        if (diferencia.inHours >= _sessionHours) {
+          // Sesión vencida → limpiar todo
+          await limpiarSesion();
+          return 'expired';
+        }
+      }
+    }
 
     semToken  = token;
     username  = prefs.getString('username')   ?? "";
     role      = prefs.getString('role')       ?? "";
     userEmail = prefs.getString('user_email') ?? "";
-    return true;
+    return 'ok';
   }
 
-  // ── Cerrar sesión ──
+  // ── Compatibilidad: versión bool antigua (uso interno) ───────
+  static Future<bool> recuperarSesion() async {
+    final estado = await recuperarSesionConEstado();
+    return estado == 'ok';
+  }
+
+  // ── Verificar si la sesión sigue vigente (llamar en cada pantalla) ─
+  static Future<bool> sesionVigente() async {
+    if (semToken == null) return false;
+    final prefs      = await SharedPreferences.getInstance();
+    final loginStr   = prefs.getString('login_time');
+    if (loginStr == null) return false;
+    final loginTime  = DateTime.tryParse(loginStr);
+    if (loginTime == null) return false;
+    return DateTime.now().difference(loginTime).inHours < _sessionHours;
+  }
+
+  /// Cuánto tiempo queda en la sesión (para mostrar al usuario si quieres)
+  static Future<Duration?> tiempoRestante() async {
+    final prefs    = await SharedPreferences.getInstance();
+    final loginStr = prefs.getString('login_time');
+    if (loginStr == null) return null;
+    final loginTime = DateTime.tryParse(loginStr);
+    if (loginTime == null) return null;
+    final expira   = loginTime.add(Duration(hours: _sessionHours));
+    final restante = expira.difference(DateTime.now());
+    return restante.isNegative ? Duration.zero : restante;
+  }
+
+  // ── Cerrar sesión ────────────────────────────────────────────
   static Future<void> limpiarSesion() async {
     semToken  = null;
     username  = null;
