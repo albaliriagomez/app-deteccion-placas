@@ -414,7 +414,7 @@ class _ResultadoVerificacionScreenState
     );
   }
 
-  // ── Lógica intacta ────────────────────────────────────────────
+  // ── Lógica intacta pero ARREGLADA ────────────────────────────
   Future<void> _notificarInfraccion(BuildContext context) async {
     if (_notificando) return;
     debugPrint(
@@ -430,10 +430,28 @@ class _ResultadoVerificacionScreenState
       );
       return;
     }
+ 
+    // ✅ NUEVO: Verificar sesión ANTES de intentar notificar
+    bool sesionVigente = await SessionManager.sesionVigente();
+    if (!sesionVigente) {
+      // ✅ CORRECTO: Si expiró, ir directamente al login sin error rojo
+      if (mounted) {
+        await Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+          (route) => false,
+          arguments: {'sessionExpired': true}
+        );
+      }
+      return;
+    }
+ 
     setState(() => _notificando = true);
     try {
       final token = SessionManager.semToken;
       if (token == null) throw Exception("No hay sesión activa");
+      
+      // ✅ NotificacionService ahora obtiene el email automáticamente
       await NotificacionService.enviarNotificacion(
         token:     token,
         placa:     _placa,

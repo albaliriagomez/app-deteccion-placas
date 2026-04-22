@@ -6,13 +6,15 @@ import '../../services/session_manager.dart';
 import '../../core/config/env_config.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// Si viene con [sessionExpired] = true, muestra aviso automático
+  final bool sessionExpired;
+  const LoginScreen({super.key, this.sessionExpired = false});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   // ── Paleta oficial ────────────────────────────────────────────
   static const Color _purple     = Color(0xFF462677);
   static const Color _purpleMid  = Color(0xFF6C559F);
@@ -21,22 +23,115 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _cyanDark   = Color(0xFF00ABD6);
   static const Color _green      = Color(0xFFA5C857);
   static const Color _red        = Color(0xFFE32344);
+  static const Color _orange     = Color(0xFFFF8C00);
 
-  bool _obscure = true;
+  bool _obscure   = true;
   final _userController = TextEditingController();
   final _passController = TextEditingController();
   bool _isLoading = false;
 
+  late AnimationController _shakeController;
+  late Animation<double>    _shakeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shakeAnim = Tween<double>(begin: 0, end: 8).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn),
+    );
+
+    // Mostrar aviso de sesión expirada si corresponde
+    if (widget.sessionExpired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSessionExpiredDialog();
+      });
+    }
+  }
+
+  // ── Diálogo sesión expirada ───────────────────────────────────
+  void _showSessionExpiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ícono de reloj
+              Container(
+                width: 72, height: 72,
+                decoration: BoxDecoration(
+                  color: _orange.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.timer_off_rounded,
+                    color: _orange, size: 36),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Sesión terminada',
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: _purple),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Tu turno de 8 horas ha finalizado.\nPor seguridad, debes volver a ingresar tus credenciales.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Entendido, ingresar',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Login ─────────────────────────────────────────────────────
   Future<void> _login() async {
     if (_userController.text.trim().isEmpty || _passController.text.isEmpty) {
       _showError("Por favor llene todos los campos");
+      _shakeController.forward(from: 0);
       return;
     }
     setState(() => _isLoading = true);
     try {
       final url = Uri.parse('${EnvConfig.baseUrl}/api/login');
-      print("🌐 URL: $url");  // ← VER QUÉ URL ESTÁ USANDO
-      
+      print("🌐 URL: $url");
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -44,29 +139,30 @@ class _LoginScreenState extends State<LoginScreen> {
           'username': _userController.text.trim(),
           'password': _passController.text,
         }),
-      ).timeout(const Duration(minutes: 1));  
-      
-      print("📡 STATUS: ${response.statusCode}");  // ← VER EL CÓDIGO
-      print("📡 BODY: ${response.body}");           // ← VER LA RESPUESTA
+      ).timeout(const Duration(minutes: 1));
+
+      print("📡 STATUS: ${response.statusCode}");
+      print("📡 BODY: ${response.body}");
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-  
+
         await SessionManager.guardarSesion(
           token:    data['sem_token'],
           user:     data['username'],
           userRole: data['role'],
           email:    _userController.text.trim().toLowerCase(),
-      );
-  
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/app');
+        );
+
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/app');
       } else {
         print("❌ LOGIN FALLÓ — status: ${response.statusCode}");
         _showError("Usuario o contraseña incorrectos");
+        _shakeController.forward(from: 0);
       }
     } catch (e) {
-      print("🔥 EXCEPCIÓN: $e");  // ← VER SI ES TIMEOUT U OTRO ERROR
+      print("🔥 EXCEPCIÓN: $e");
       _showError("Error de conexión con el servidor");
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -87,6 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _userController.dispose();
     _passController.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
@@ -98,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: const Color(0xFFF8FAFF),
       body: Stack(
         children: [
-          // ── Fondo decorativo superior ─────────────────────────
+          // ── Fondo decorativo superior ──────────────────────
           Positioned(
             top: 0, left: 0, right: 0,
             height: size.height * 0.42,
@@ -115,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          // ── Círculos decorativos de fondo ─────────────────────
+          // ── Círculos decorativos ───────────────────────────
           Positioned(
             top: -40, right: -40,
             child: Container(
@@ -137,19 +234,52 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          // ── Contenido principal ───────────────────────────────
+          // ── Contenido principal ────────────────────────────
           SafeArea(
             child: SingleChildScrollView(
               child: Column(
                 children: [
                   const SizedBox(height: 30),
 
-                  // ── Escudo + títulos ──────────────────────────
+                  // Banner de sesión expirada (visible antes del diálogo)
+                  if (widget.sessionExpired)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: _orange.withOpacity(0.4), width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.timer_off_rounded,
+                                color: _orange, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Sesión de 8 horas finalizada.\nVuelve a ingresar para continuar.',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: _orange,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // ── Escudo + títulos ───────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Column(
                       children: [
-                        // Escudo con sombra y borde
                         Container(
                           width: 120, height: 120,
                           decoration: BoxDecoration(
@@ -181,8 +311,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Nombre sistema
                         Text(
                           'SEM',
                           style: GoogleFonts.poppins(
@@ -192,7 +320,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             letterSpacing: 3,
                           ),
                         ),
-                        // Badge subtítulo
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 4),
@@ -227,168 +354,175 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 32),
 
-                  // ── Card de login ─────────────────────────────
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _purple.withOpacity(0.10),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Encabezado card
-                        Row(
-                          children: [
-                            Container(
-                              width: 4, height: 24,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [_purple, _cyanMid],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
+                  // ── Card de login con efecto shake ─────────
+                  AnimatedBuilder(
+                    animation: _shakeAnim,
+                    builder: (_, child) {
+                      final offset = _shakeController.isAnimating
+                          ? _shakeAnim.value *
+                              ((_shakeController.value * 10).toInt() % 2 == 0
+                                  ? 1
+                                  : -1)
+                          : 0.0;
+                      return Transform.translate(
+                        offset: Offset(offset, 0),
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _purple.withOpacity(0.10),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 4, height: 24,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [_purple, _cyanMid],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
-                                borderRadius: BorderRadius.circular(2),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Bienvenido',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                        color: _purple)),
-                                Text('Ingresa tus credenciales SEM',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade500)),
-                              ],
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Bienvenido',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: _purple)),
+                                  Text('Ingresa tus credenciales SEM',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade500)),
+                                ],
+                              ),
+                            ],
+                          ),
 
-                        const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
-                        // Campo email
-                        _buildInput(
-                          controller: _userController,
-                          hint:  "correo@sem.gob.bo",
-                          label: "Email SEM",
-                          icon:  Icons.email_outlined,
-                        ),
-                        const SizedBox(height: 16),
+                          _buildInput(
+                            controller: _userController,
+                            hint:  "correo@sem.gob.bo",
+                            label: "Email SEM",
+                            icon:  Icons.email_outlined,
+                          ),
+                          const SizedBox(height: 16),
 
-                        // Campo contraseña
-                        _buildInput(
-                          controller: _passController,
-                          hint:   "••••••••",
-                          label:  "Contraseña",
-                          icon:   Icons.lock_outline_rounded,
-                          isPass: true,
-                        ),
+                          _buildInput(
+                            controller: _passController,
+                            hint:   "••••••••",
+                            label:  "Contraseña",
+                            icon:   Icons.lock_outline_rounded,
+                            isPass: true,
+                          ),
 
-                        // ¿Olvidó contraseña?
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero),
-                            child: Text(
-                              "¿Olvidó su contraseña?",
-                              style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: _cyanDark,
-                                  fontWeight: FontWeight.w600),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {},
+                              style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero),
+                              child: Text(
+                                "¿Olvidó su contraseña?",
+                                style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: _cyanDark,
+                                    fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
-                        ),
 
-                        const SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
-                        // Botón ingresar
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: _isLoading
-                                  ? null
-                                  : const LinearGradient(
-                                      colors: [_purple, _purpleMid],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                              color: _isLoading
-                                  ? Colors.grey.shade300
-                                  : null,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: _isLoading
-                                  ? []
-                                  : [
-                                      BoxShadow(
-                                        color: _purple.withOpacity(0.4),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 6),
-                                      )
-                                    ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                disabledBackgroundColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 22, height: 22,
-                                      child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.5),
-                                    )
-                                  : Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                            Icons.login_rounded,
-                                            color: Colors.white,
-                                            size: 20),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          'Ingresar al Sistema',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                          ),
-                                        ),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: _isLoading
+                                    ? null
+                                    : const LinearGradient(
+                                        colors: [_purple, _purpleMid],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                color: _isLoading
+                                    ? Colors.grey.shade300
+                                    : null,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: _isLoading
+                                    ? []
+                                    : [
+                                        BoxShadow(
+                                          color: _purple.withOpacity(0.4),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        )
                                       ],
-                                    ),
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  disabledBackgroundColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  elevation: 0,
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22, height: 22,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.5),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.login_rounded,
+                                              color: Colors.white, size: 20),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            'Ingresar al Sistema',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // ── Biometría ─────────────────────────────────
                   Text(
                     'O ACCEDER CON',
                     style: GoogleFonts.poppins(
@@ -409,7 +543,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ── Footer ────────────────────────────────────
                   Text(
                     'SEM Cochabamba · v2.0 · 2025',
                     style: GoogleFonts.poppins(
@@ -426,7 +559,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Campo de texto ────────────────────────────────────────────
   Widget _buildInput({
     required TextEditingController controller,
     required String hint,
@@ -485,7 +617,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Botón biométrico ──────────────────────────────────────────
   Widget _biometricBtn(IconData icon, String label) {
     return GestureDetector(
       onTap: () {},
