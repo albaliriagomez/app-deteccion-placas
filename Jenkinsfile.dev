@@ -1,15 +1,21 @@
 pipeline {
-    agent any
+    agent { label 'server_104.64' }
 
     environment {
-        LABEL_SERVER  = "server_104.64"
-        COMPOSE_FILE  = "docker-compose-dev.yml"
+        LABEL_SERVER   = "server_104.64"
+        COMPOSE_FILE   = "docker-compose-dev.yml"
         CONTAINER_NAME = "lpr-backend-api"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     stages {
 
-        stage('📥 Clonar repositorio') {
+        stage('📥 Verificar repositorio') {
             steps {
                 echo "✅ Código clonado correctamente por Jenkins"
                 sh 'ls -la'
@@ -40,14 +46,13 @@ pipeline {
         stage('✅ Verificar contenedor') {
             steps {
                 echo "✅ Verificando que el contenedor está corriendo..."
-                sh """
+                sh '''
                     sleep 35
                     echo "=== LOGS DEL CONTENEDOR ==="
                     docker logs ${CONTAINER_NAME} || true
                     echo "=== ESTADO ==="
                     docker inspect --format='{{.State.Status}}' ${CONTAINER_NAME}
-                    docker inspect --format='{{.State.Status}}' ${CONTAINER_NAME} | grep -w running
-                """
+                '''
             }
         }
 
@@ -56,6 +61,7 @@ pipeline {
     post {
         success {
             echo "🎉 Deploy exitoso en servidor 192.168.104.64:8009"
+            echo "🌐 Accesible en: https://fotomultasapidev.cochabamba.bo"
         }
         failure {
             sh "docker logs ${CONTAINER_NAME} || true"
