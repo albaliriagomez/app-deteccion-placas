@@ -156,7 +156,7 @@ class _MapaZonasScreenState extends State<MapaZonasScreen> {
                   child: Container(
                     padding: EdgeInsets.fromLTRB(16, topPad + 10, 16, 12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [_purple, Color(0xFF6B3FA0)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -349,56 +349,60 @@ class _MapaZonasScreenState extends State<MapaZonasScreen> {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter:
-              LatLng(lista.first.latitude!, lista.first.longitude!),
-          initialZoom: 14.0,
-        ),
-        children: [
-          TileLayer(
-            urlTemplate:
-                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.tuapp.deteccion',
-            backgroundColor: const Color(0xFFE0E0E0),
+      child: Container(
+        // ✅ El color de fondo (mientras cargan los tiles) ahora va aquí
+        color: const Color(0xFFE0E0E0),
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter:
+                LatLng(lista.first.latitude!, lista.first.longitude!),
+            initialZoom: 14.0,
           ),
-          MarkerLayer(
-            markers: lista.map((registro) {
-              final config = _getStatusConfig(registro.estado);
-              return Marker(
-                point: LatLng(registro.latitude!, registro.longitude!),
-                width: 46,
-                height: 46,
-                child: GestureDetector(
-                  onTap: () => _mostrarDetalle(context, registro),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: config['bg'] as Color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: (config['markerColor'] as Color).withOpacity(0.6),
-                        width: 2,
+          children: [
+            TileLayer(
+              urlTemplate:
+                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.tuapp.deteccion',
+              // ❌ backgroundColor eliminado (ya no existe en flutter_map 8.x)
+            ),
+            MarkerLayer(
+              markers: lista.map((registro) {
+                final config = _getStatusConfig(registro.estado);
+                return Marker(
+                  point: LatLng(registro.latitude!, registro.longitude!),
+                  width: 46,
+                  height: 46,
+                  child: GestureDetector(
+                    onTap: () => _mostrarDetalle(context, registro),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: config['bg'] as Color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: (config['markerColor'] as Color).withOpacity(0.6),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (config['markerColor'] as Color)
+                                .withOpacity(0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          )
+                        ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (config['markerColor'] as Color)
-                              .withOpacity(0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        )
-                      ],
-                    ),
-                    child: Icon(
-                      config['icon'] as IconData,
-                      size: 22,
-                      color: config['iconColor'] as Color,
+                      child: Icon(
+                        config['icon'] as IconData,
+                        size: 22,
+                        color: config['iconColor'] as Color,
+                      ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }

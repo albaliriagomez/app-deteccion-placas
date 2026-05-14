@@ -6,7 +6,7 @@ import 'presentation/screens/login_screen.dart';
 import 'presentation/screens/app_shell.dart';
 import 'presentation/screens/resultado_verificacion.dart';
 import 'presentation/screens/infraccion_registrada_screen.dart';
-
+import 'presentation/screens/dictado_placa_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -78,6 +78,11 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
                 builder: (_) => const InfraccionRegistradaScreen());
 
+          case '/dictadoPlaca':
+            return MaterialPageRoute(
+              builder: (_) => const DictadoPlacaScreen(),
+            );
+            
           default:
             return MaterialPageRoute(builder: (_) => const LoginScreen());
         }

@@ -5,6 +5,7 @@ import 'dashboard.dart';
 import 'scanner_screen.dart';
 import 'records_screen.dart';
 import 'mapa_zonas_screen.dart';
+import 'dictado_placa_screen.dart';
 
 class AppShell extends StatefulWidget {
   final int initialIndex;
@@ -31,7 +32,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _index = widget.initialIndex;
-    _verificarSesion(); 
+    _verificarSesion(); // 🔥 Del Git
   }
 
   void _goTo(int index) {
@@ -39,22 +40,22 @@ class _AppShellState extends State<AppShell> {
     setState(() => _index = index);
   }
 
+  // 🔥 Logout mejorado (del Git): limpia memoria + disco
   void _logout() async {
     SessionManager.semToken = null;
     SessionManager.username = null;
     SessionManager.role     = null;
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
 
-    await SessionManager.limpiarSesion();   // limpia disco también
+    await SessionManager.limpiarSesion();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
-
+  // 🔥 Verificar sesión vigente (del Git)
   Future<void> _verificarSesion() async {
     final vigente = await SessionManager.sesionVigente();
     if (!vigente && mounted) {
-      // Limpiar datos antes de redirigir
       await SessionManager.limpiarSesion();
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false,
           arguments: {'sessionExpired': true});
@@ -65,26 +66,38 @@ class _AppShellState extends State<AppShell> {
     switch (i) {
       case 0:  return const MenuScreen();
       case 1:  return const ScannerScreen();
-      case 2:  return RecordsScreen(
+      case 2:  return const DictadoPlacaScreen(); // 🔥 Del tuyo
+      case 3:  return RecordsScreen(
                   onNavigateToScanner: () => setState(() => _index = 1));
-      case 3:  return const MapaZonasScreen();
+      case 4:  return const MapaZonasScreen();
       default: return const MenuScreen();
     }
   }
 
-  // Títulos e íconos de cada tab
-  static const _titles = ['Dashboard', 'Escanear', 'Historial', 'Mapa'];
-  static const _icons  = [
+  // Títulos e íconos de cada tab (con dictado)
+  static const _titles = [
+    'Dashboard',
+    'Escanear',
+    'Dictado de Placa',
+    'Historial',
+    'Mapa',
+  ];
+
+  static const _icons = [
     Icons.dashboard_customize_rounded,
     Icons.qr_code_scanner_rounded,
+    Icons.mic_rounded,
     Icons.history_rounded,
     Icons.map_rounded,
   ];
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 Fondo oscuro para dictado, claro para el resto (del tuyo)
+    final bool isDark = _index == 2;
+
     return Scaffold(
-      backgroundColor: _bgLight,
+      backgroundColor: isDark ? const Color(0xFF1A1630) : _bgLight,
       // ── AppBar con gradiente morado ───────────────────────────
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
@@ -264,10 +277,11 @@ class _AppDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
+                  // 🔥 Dictado de Placa (del tuyo)
                   _DrawerItem(
-                    icon:      Icons.history_rounded,
-                    title:     'Historial',
-                    subtitle:  'Mis registros',
+                    icon:      Icons.mic_rounded,
+                    title:     'Dictado de Placa',
+                    subtitle:  'Ingreso por voz',
                     index:     2,
                     active:    activeIndex == 2,
                     activeColor: _purple,
@@ -276,13 +290,24 @@ class _AppDrawer extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   _DrawerItem(
-                    icon:      Icons.map_rounded,
-                    title:     'Mapa de Zonas',
-                    subtitle:  'Geolocalización',
+                    icon:      Icons.history_rounded,
+                    title:     'Historial',
+                    subtitle:  'Mis registros',
                     index:     3,
                     active:    activeIndex == 3,
                     activeColor: _purple,
                     onTap:     () => onItemSelected(3),
+                  ),
+                  const SizedBox(height: 8),
+
+                  _DrawerItem(
+                    icon:      Icons.map_rounded,
+                    title:     'Mapa de Zonas',
+                    subtitle:  'Geolocalización',
+                    index:     4,
+                    active:    activeIndex == 4,
+                    activeColor: _purple,
+                    onTap:     () => onItemSelected(4),
                   ),
 
                   const SizedBox(height: 24),
@@ -503,9 +528,9 @@ class _DrawerScanAction extends StatelessWidget {
   final VoidCallback onTap;
   final bool isActive;
 
-  static const Color _green    = Color(0xFFA5C857);
+  static const Color _green     = Color(0xFFA5C857);
   static const Color _greenDark = Color(0xFF7A9E2E);
-  static const Color _purple   = Color(0xFF462677);
+  static const Color _purple    = Color(0xFF462677);
 
   const _DrawerScanAction({
     required this.onTap,

@@ -5,11 +5,27 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
+rootProject.buildDir = "../build"
+
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
+subprojects { subproject ->
+    subproject.plugins.withId("com.android.library") {
+        def android = subproject.extensions.findByName("android")
+        if (android != null && (android.namespace == null || android.namespace == "")) {
+            android.namespace = "com.example.${subproject.name.replace('-', '_')}"
+        }
+    }
+
+    subproject.plugins.withId("com.android.application") {
+        def android = subproject.extensions.findByName("android")
+        if (android != null && (android.namespace == null || android.namespace == "")) {
+            android.namespace = "com.example.${subproject.name.replace('-', '_')}"
+        }
+    }
+}
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
