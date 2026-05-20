@@ -17,37 +17,9 @@ pluginManagement {
 }
 
 plugins {
-    id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
     id "com.android.application" version "8.9.1" apply false
-    id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+    id "org.jetbrains.kotlin.android" version "2.1.0" apply false
 }
 
-// ESTO ES LO QUE SOLUCIONA LOS "NOT FOUND":
 include ":app"
-
-// Load flutter SDK path from local.properties or environment
-def flutterSdkPath = null
-def localPropsFile = new File(rootDir, 'local.properties')
-if (localPropsFile.exists()) {
-    def localProps = new Properties()
-    localPropsFile.withInputStream { localProps.load(it) }
-    flutterSdkPath = localProps.getProperty('flutter.sdk')
-}
-if (flutterSdkPath == null) {
-    flutterSdkPath = System.getenv('FLUTTER_ROOT')
-}
-
-// Load plugins once and apply the Flutter plugin loader if available
-def plugins = new Properties()
-def pluginsFile = new File(rootProject.projectDir.parentFile, '.flutter-plugins-dependencies')
-if (pluginsFile.exists()) {
-    pluginsFile.withInputStream { plugins.load(it) }
-}
-
-plugins.each { name, path ->
-    // Keep the hook for plugins if needed. Do not re-declare variables.
-}
-
-if (pluginsFile.exists() && flutterSdkPath != null) {
-    apply from: "${flutterSdkPath}/packages/flutter_tools/gradle/app_plugin_loader.gradle"
-}

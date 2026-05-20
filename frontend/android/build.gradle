@@ -11,6 +11,7 @@ subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
+// Fix para plugins que no declaran namespace (necesario con AGP 8+)
 subprojects { subproject ->
     subproject.plugins.withId("com.android.library") {
         def android = subproject.extensions.findByName("android")
