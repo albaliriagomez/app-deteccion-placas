@@ -19,57 +19,64 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
   final _audioService = AudioService();
 
   bool _isRecording = false;
-  final List<String> _chars = [];  // ✅ PERSISTENTE entre grabaciones
+  final List<String> _chars = [];
   static const int _maxChars = 7;
 
-  String _statusMsg = 'Toca el mic y dicta 1 o más dígitos';
+  String _statusMsg = 'Toca el mic y dicta la placa completa';
   Color _statusColor = Colors.white70;
   String _textoEnVivo = '';
 
-  // Para saber cuántos chars HABÍA antes de empezar la grabación actual
-  int _charsAntesDeEstaGrabacion = 0;
-
   late AnimationController _pulse;
 
-  // MAPEO FONÉTICO
+  // ===== MAPEO FONÉTICO EXPANDIDO PARA PLACAS BOLIVIANAS =====
   static const Map<String, String> _mapaFonetico = {
-    'a': 'A', 'á': 'A', 'ha': 'A',
+    // === LETRAS ===
+    'a': 'A', 'á': 'A', 'ha': 'A', 'ah': 'A',
     'be': 'B', 'b': 'B', 'beh': 'B', 'bé': 'B',
-    'ce': 'C', 'c': 'C', 'se': 'C', 'sé': 'C', 'cé': 'C',
-    'de': 'D', 'd': 'D', 'dé': 'D',
+    'ce': 'C', 'c': 'C', 'se': 'C', 'sé': 'C', 'cé': 'C', 'ceh': 'C',
+    'de': 'D', 'd': 'D', 'dé': 'D', 'deh': 'D',
     'e': 'E', 'é': 'E', 'eh': 'E', 'he': 'E',
-    'efe': 'F', 'f': 'F', 'fe': 'F',
-    'ge': 'G', 'g': 'G', 'je': 'G', 'gé': 'G',
-    'hache': 'H', 'h': 'H', 'ache': 'H',
-    'i': 'I', 'í': 'I', 'hi': 'I',
-    'jota': 'J', 'j': 'J',
-    'ka': 'K', 'k': 'K', 'kappa': 'K', 'ca': 'K',
-    'ele': 'L', 'l': 'L',
-    'eme': 'M', 'm': 'M',
-    'ene': 'N', 'n': 'N',
+    'efe': 'F', 'f': 'F', 'fe': 'F', 'eff': 'F',
+    'ge': 'G', 'g': 'G', 'je': 'G', 'gé': 'G', 'gué': 'G', 'gue': 'G',
+    'hache': 'H', 'h': 'H', 'ache': 'H', 'haché': 'H',
+    'i': 'I', 'í': 'I', 'hi': 'I', 'ih': 'I',
+    'jota': 'J', 'j': 'J', 'yota': 'J',
+    'ka': 'K', 'k': 'K', 'kappa': 'K', 'ca': 'K', 'kah': 'K',
+    'ele': 'L', 'l': 'L', 'eleh': 'L',
+    'eme': 'M', 'm': 'M', 'emeh': 'M',
+    'ene': 'N', 'n': 'N', 'eneh': 'N',
     'o': 'O', 'ó': 'O', 'oh': 'O', 'ho': 'O',
-    'pe': 'P', 'p': 'P', 'pé': 'P',
-    'cu': 'Q', 'q': 'Q', 'ku': 'Q',
-    'ere': 'R', 'erre': 'R', 'r': 'R',
-    'ese': 'S', 's': 'S',
-    'te': 'T', 't': 'T', 'té': 'T',
-    'u': 'U', 'ú': 'U',
+    'pe': 'P', 'p': 'P', 'pé': 'P', 'peh': 'P',
+    'cu': 'Q', 'q': 'Q', 'ku': 'Q', 'qu': 'Q', 'que': 'Q',
+    'ere': 'R', 'erre': 'R', 'r': 'R', 'ereh': 'R', 'erreh': 'R',
+    'ese': 'S', 's': 'S', 'eseh': 'S',
+    'te': 'T', 't': 'T', 'té': 'T', 'teh': 'T',
+    'u': 'U', 'ú': 'U', 'uh': 'U',
     've': 'V', 'uve': 'V', 'v': 'V', 'vé': 'V',
-    'doble': 'W', 'doble u': 'W', 'w': 'W', 'doblev': 'W', 'doble v': 'W',
-    'equis': 'X', 'x': 'X',
-    'ye': 'Y', 'igriega': 'Y', 'i griega': 'Y', 'y': 'Y',
-    'zeta': 'Z', 'z': 'Z', 'seta': 'Z', 'ceta': 'Z',
+    'w': 'W',
+    'equis': 'X', 'x': 'X', 'ekis': 'X',
+    'ye': 'Y', 'igriega': 'Y', 'y': 'Y',
+    'zeta': 'Z', 'z': 'Z', 'seta': 'Z', 'ceta': 'Z', 'zetah': 'Z',
 
-    'cero': '0', '0': '0',
+    // === DÍGITOS ===
+    'cero': '0', '0': '0', 'sero': '0', 'zero': '0',
     'uno': '1', 'un': '1', '1': '1', 'una': '1',
-    'dos': '2', '2': '2',
-    'tres': '3', '3': '3',
-    'cuatro': '4', '4': '4',
-    'cinco': '5', '5': '5', 'sinco': '5',
-    'seis': '6', '6': '6',
-    'siete': '7', '7': '7',
-    'ocho': '8', '8': '8',
-    'nueve': '9', '9': '9',
+    'dos': '2', '2': '2', 'dós': '2',
+    'tres': '3', '3': '3', 'tré': '3',
+    'cuatro': '4', '4': '4', 'quatro': '4',
+    'cinco': '5', '5': '5', 'sinco': '5', 'cinko': '5',
+    'seis': '6', '6': '6', 'séis': '6', 'sei': '6',
+    'siete': '7', '7': '7', 'site': '7',
+    'ocho': '8', '8': '8', 'osho': '8',
+    'nueve': '9', '9': '9', 'nuebe': '9',
+  };
+
+  // Palabras COMPUESTAS - se procesan antes del split por espacios
+  static const Map<String, String> _compuestos = {
+    'be larga': 'B', 'be grande': 'B', 'be alta': 'B',
+    've corta': 'V', 've chica': 'V', 've pequeña': 'V', 've baja': 'V',
+    'doble u': 'W', 'doble v': 'W', 'doble ve': 'W', 'doble uve': 'W',
+    'i griega': 'Y',
   };
 
   @override
@@ -87,10 +94,13 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
         setState(() {
           _isRecording = false;
           if (err == 'error_no_match' || err == 'error_speech_timeout') {
-            _statusMsg = 'No te escuché. Toca el mic y habla más fuerte';
+            _statusMsg = 'No te escuché. Toca el mic e intenta de nuevo';
             _statusColor = Colors.orange;
+          } else if (err.contains('permission')) {
+            _statusMsg = 'Activa el permiso de micrófono';
+            _statusColor = _red;
           } else {
-            _statusMsg = 'Error: $err. Intenta de nuevo';
+            _statusMsg = 'Error. Toca el mic para reintentar';
             _statusColor = _red;
           }
         });
@@ -105,13 +115,31 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
     super.dispose();
   }
 
+  /// Convierte texto completo a lista de caracteres de placa.
   List<String> _convertirAChars(String texto) {
-    final palabras = texto
-        .toLowerCase()
-        .trim()
+    String textoNorm = texto.toLowerCase().trim();
+
+    // Paso 1: Reemplazar compuestos PRIMERO con tokens únicos
+    int tokenIdx = 0;
+    final Map<String, String> tokensTemporales = {};
+
+    for (final entry in _compuestos.entries) {
+      while (textoNorm.contains(entry.key)) {
+        final token = '__tk${tokenIdx}__';
+        tokensTemporales[token] = entry.value;
+        textoNorm = textoNorm.replaceFirst(entry.key, ' $token ');
+        tokenIdx++;
+      }
+    }
+
+    // Paso 2: Normalizar separadores
+    textoNorm = textoNorm
         .replaceAll(',', ' ')
         .replaceAll('.', ' ')
         .replaceAll('-', ' ')
+        .replaceAll('/', ' ');
+
+    final palabras = textoNorm
         .split(RegExp(r'\s+'))
         .where((p) => p.isNotEmpty)
         .toList();
@@ -119,6 +147,13 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
     final resultado = <String>[];
 
     for (final palabra in palabras) {
+      // Token de compuesto
+      if (tokensTemporales.containsKey(palabra)) {
+        resultado.add(tokensTemporales[palabra]!);
+        continue;
+      }
+
+      // Secuencia de dígitos pegados (ej: "1234")
       if (RegExp(r'^\d+$').hasMatch(palabra)) {
         for (final digito in palabra.split('')) {
           resultado.add(digito);
@@ -126,74 +161,100 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
         continue;
       }
 
+      // Palabra fonética conocida
       if (_mapaFonetico.containsKey(palabra)) {
         resultado.add(_mapaFonetico[palabra]!);
         continue;
       }
 
+      // Letra individual a-z
       if (palabra.length == 1 && RegExp(r'[a-z]').hasMatch(palabra)) {
         resultado.add(palabra.toUpperCase());
+        continue;
+      }
+
+      // Mezcla de letras+números pegados (ej: "abc123")
+      if (RegExp(r'^[a-z0-9]+$').hasMatch(palabra)) {
+        for (final c in palabra.split('')) {
+          if (RegExp(r'[a-z]').hasMatch(c)) {
+            resultado.add(c.toUpperCase());
+          } else {
+            resultado.add(c);
+          }
+        }
       }
     }
 
     return resultado;
   }
 
-  /// 🔥 Resultado parcial: actualiza chars de esta grabación en vivo
-  void _onResultadoParcial(String texto) {
+  /// Procesa la transcripción y RECONSTRUYE toda la placa.
+  void _procesarTranscripcion(String texto, {required bool esFinal}) {
+    if (texto.isEmpty) return;
+
     final nuevos = _convertirAChars(texto);
 
     setState(() {
-      _textoEnVivo = texto;
+      _textoEnVivo = esFinal ? '' : texto;
 
-      // Borrar los chars que se agregaron en ESTA grabación
-      if (_chars.length > _charsAntesDeEstaGrabacion) {
-        _chars.removeRange(_charsAntesDeEstaGrabacion, _chars.length);
-      }
-
-      // Agregar los nuevos
+      // Reemplazar todo el contenido (la transcripción es acumulativa)
+      _chars.clear();
       for (final c in nuevos) {
         if (_chars.length >= _maxChars) break;
         _chars.add(c);
+      }
+
+      // Actualizar status
+      if (_chars.isEmpty) {
+        _statusMsg = '🎤 Escuchando... habla más fuerte';
+        _statusColor = Colors.orange;
+      } else if (_chars.length >= _maxChars) {
+        _statusMsg = '✅ Placa completa: ${_chars.join()}';
+        _statusColor = _green;
+        // Auto-detener al completar
+        _detenerEscucha();
+      } else {
+        _statusMsg =
+            '${_chars.join()} (${_chars.length}/$_maxChars) - sigue dictando...';
+        _statusColor = _cyan;
       }
     });
   }
 
-  /// Resultado final: consolida lo reconocido
+  void _onResultadoParcial(String texto) {
+    _procesarTranscripcion(texto, esFinal: false);
+  }
+
   void _onResultadoFinal(String texto) {
-    final nuevos = _convertirAChars(texto);
+    _procesarTranscripcion(texto, esFinal: true);
+  }
 
-    setState(() {
-      _isRecording = false;
-      _textoEnVivo = '';
-
-      // Restaurar lo previo + agregar lo nuevo
-      if (_chars.length > _charsAntesDeEstaGrabacion) {
-        _chars.removeRange(_charsAntesDeEstaGrabacion, _chars.length);
-      }
-      for (final c in nuevos) {
-        if (_chars.length >= _maxChars) break;
-        _chars.add(c);
-      }
-
-      if (_chars.isEmpty) {
-        _statusMsg = 'No se reconoció nada';
-        _statusColor = _red;
-      } else if (_chars.length >= _maxChars) {
-        _statusMsg = '✅ Placa completa: ${_chars.join()}';
-        _statusColor = _green;
-      } else {
-        _statusMsg = '${_chars.join()} (${_chars.length}/$_maxChars) - toca el mic para continuar';
-        _statusColor = Colors.orange;
-      }
-    });
+  Future<void> _detenerEscucha() async {
+    await _audioService.stopListening();
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _textoEnVivo = '';
+      });
+    }
   }
 
   Future<void> _toggleRecording() async {
     try {
       if (_isRecording) {
-        await _audioService.stopListening();
-        setState(() => _isRecording = false);
+        await _detenerEscucha();
+        if (mounted) {
+          setState(() {
+            if (_chars.isEmpty) {
+              _statusMsg = 'Detenido. Toca el mic para empezar';
+              _statusColor = Colors.white70;
+            } else if (_chars.length < _maxChars) {
+              _statusMsg =
+                  '${_chars.join()} (${_chars.length}/$_maxChars) - detenido';
+              _statusColor = Colors.orange;
+            }
+          });
+        }
       } else {
         if (_chars.length >= _maxChars) {
           setState(() {
@@ -204,9 +265,9 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
         }
 
         setState(() {
-          _charsAntesDeEstaGrabacion = _chars.length; // Guardar estado actual
           _textoEnVivo = '';
-          _statusMsg = '🎤 HABLA AHORA';
+          _chars.clear(); // Sesión nueva = empieza limpio
+          _statusMsg = '🎤 HABLA AHORA - dicta la placa completa';
           _statusColor = _cyan;
           _isRecording = true;
         });
@@ -214,12 +275,18 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
         await _audioService.startListening(
           onResult: _onResultadoParcial,
           onFinal: _onResultadoFinal,
+          onSessionEnd: () {
+            if (mounted) {
+              setState(() => _isRecording = false);
+            }
+          },
         );
       }
     } catch (e) {
       setState(() {
         _isRecording = false;
-        _statusMsg = 'Error: ${e.toString().replaceAll('Exception: ', '')}';
+        _statusMsg =
+            'Error: ${e.toString().replaceAll('Exception: ', '')}';
         _statusColor = _red;
       });
     }
@@ -235,13 +302,26 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
     }
   }
 
-  void _borrarTodo() {
+  void _borrarTodo() async {
+    if (_isRecording) {
+      await _detenerEscucha();
+    }
     setState(() {
       _chars.clear();
       _textoEnVivo = '';
       _statusMsg = 'Limpio. Toca el mic para empezar';
       _statusColor = Colors.white70;
     });
+  }
+
+  /// Helper para aplicar opacidad sin usar withOpacity (deprecated)
+  Color _conAlpha(Color color, double alpha) {
+    return Color.fromARGB(
+      (alpha * 255).round(),
+      (color.r * 255).round(),
+      (color.g * 255).round(),
+      (color.b * 255).round(),
+    );
   }
 
   @override
@@ -253,7 +333,6 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
               Text(
                 'DICTADO DE PLACA',
                 style: GoogleFonts.rajdhani(
@@ -262,13 +341,11 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Text(
-                  'Toca el mic, dicta 1+ dígitos\nSe acumula entre grabaciones',
+                  'Toca el mic UNA VEZ y dicta toda la placa\nEj: "tres cuatro cinco be ele zeta"',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
@@ -276,26 +353,25 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
                   ),
                 ),
               ),
-
               const SizedBox(height: 25),
-
               _PlacaDisplay(chars: _chars, maxChars: _maxChars),
-
               const SizedBox(height: 12),
-
               SizedBox(
                 height: 28,
                 child: _textoEnVivo.isNotEmpty
                     ? Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 30),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _cyan.withOpacity(0.15),
+                            color: _conAlpha(_cyan, 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '🎙️ "$_textoEnVivo"',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               color: _cyan,
@@ -306,9 +382,7 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
                       )
                     : null,
               ),
-
               const SizedBox(height: 8),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -331,9 +405,7 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
-
               GestureDetector(
                 onTap: _toggleRecording,
                 child: AnimatedBuilder(
@@ -353,9 +425,7 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
@@ -372,16 +442,14 @@ class _DictadoPlacaScreenState extends State<DictadoPlacaScreen>
   }
 }
 
-
 class _PlacaDisplay extends StatelessWidget {
   final List<String> chars;
   final int maxChars;
 
   const _PlacaDisplay({
-    Key? key,
     required this.chars,
     required this.maxChars,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -404,12 +472,15 @@ class _PlacaDisplay extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 3),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: hasChar ? const Color(0xFF1A1630) : Colors.grey.shade200,
+              color:
+                  hasChar ? const Color(0xFF1A1630) : Colors.grey.shade200,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: hasChar
                     ? const Color(0xFF49C7EA)
-                    : (isCurrent ? const Color(0xFF49C7EA) : Colors.grey.shade400),
+                    : (isCurrent
+                        ? const Color(0xFF49C7EA)
+                        : Colors.grey.shade400),
                 width: hasChar || isCurrent ? 2 : 1,
               ),
             ),

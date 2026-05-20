@@ -27,7 +27,7 @@ android {
     namespace "com.example.appdeteccion"
     compileSdk 36
 
-    ndkVersion "28.2.13676358"  
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -41,13 +41,13 @@ android {
     defaultConfig {
         applicationId "com.example.appdeteccion"
 
-        minSdkVersion 24         
+        minSdkVersion 24
         targetSdk 36
 
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
 
-        multiDexEnabled true      
+        multiDexEnabled true
     }
 
     buildTypes {

@@ -31,9 +31,14 @@ dependencies:
   geocoding: ^4.0.0
 
   # IA / CAMARA
-  camera: ^0.12.0+1
+  camera: ^0.11.0+2
   google_mlkit_text_recognition: ^0.15.1
   image: ^4.1.7
+
+# 🔧 Forzar versiones nuevas de plugins que el resolver puede dejar viejas
+# Esto soluciona el error "cannot find symbol: class Registrar"
+dependency_overrides:
+  flutter_plugin_android_lifecycle: ^2.0.24
 
 dev_dependencies:
   flutter_test:
